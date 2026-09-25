@@ -1,0 +1,3279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hazard Detection — natural hazard indicator map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#132118;
+    --paper:#f6f4ee;
+    --panel:#ffffff;
+    --line:#d9d4c6;
+    --moss:#3c5a44;
+    --moss-dark:#25392c;
+    --river:#2f5f74;
+    --amber:#b8791f;
+    --clay:#a4442c;
+    --quake:#6b5a45;
+    --volcano:#b8452e;
+    --conflict:#6b4a5c;
+    --heat:#c14a2c;
+    --wind:#3a7a80;
+    --storm:#2c4870;
+    --low:#3c7a4e;
+    --mod:#c08a1e;
+    --high:#c05a2b;
+    --severe:#a4302c;
+    --muted:#6b6a5f;
+  }
+  :root[data-theme="dark"]{
+    --ink:#eae7dd;
+    --paper:#10150f;
+    --panel:#181f16;
+    --line:#333d2e;
+    --moss:#7fbf8f;
+    --moss-dark:#5c9a6c;
+    --river:#6fa8c2;
+    --amber:#e0a64f;
+    --clay:#d1795c;
+    --quake:#a48d70;
+    --volcano:#e07850;
+    --conflict:#b090a8;
+    --heat:#e07a58;
+    --wind:#6bb3ba;
+    --storm:#7f9bc9;
+    --low:#7fbf8f;
+    --mod:#e0a64f;
+    --high:#d1795c;
+    --severe:#e0645f;
+    --muted:#9aa08e;
+  }
+  body, header, .app, aside, .home-panel, .map-search-box, .card, .toolbar-btn{
+    transition:background-color .25s ease, color .25s ease, border-color .25s ease;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    display:flex;
+    flex-direction:column;
+    min-height:100vh;
+  }
+  header{
+    padding:10px 20px;
+    border-bottom:1px solid var(--line);
+    background:var(--paper);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  header h1{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:16.5px;
+    margin:0;
+    letter-spacing:-0.01em;
+    white-space:nowrap;
+  }
+  header h1 span{color:var(--moss);}
+  .header-actions{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+    position:relative;
+  }
+  .toolbar-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    font-size:13px;
+    font-weight:600;
+    padding:8px 14px;
+    border-radius:6px;
+    cursor:pointer;
+  }
+  .toolbar-btn:hover{background:color-mix(in srgb, var(--moss) 12%, var(--panel));}
+  .toolbar-btn.active{
+    background:var(--moss);
+    border-color:var(--moss);
+    color:#fbf9f2;
+  }
+  #clear-area-btn{
+    border-color:color-mix(in srgb, var(--severe) 45%, var(--line));
+    color:var(--severe);
+  }
+  #clear-area-btn:hover{background:color-mix(in srgb, var(--severe) 12%, var(--panel));}
+  .toolbar-btn:disabled{
+    opacity:0.45;
+    cursor:not-allowed;
+  }
+  .toolbar-btn:disabled:hover{background:var(--panel);}
+  .toolbar-divider{
+    width:1px;
+    align-self:stretch;
+    background:var(--line);
+    margin:2px 2px;
+  }
+  .toolbar-section-label{
+    font-family:'Fraunces',serif;
+    font-size:12px;
+    font-weight:600;
+    color:var(--muted);
+    letter-spacing:0.02em;
+    white-space:nowrap;
+  }
+  .about-dropdown{position:relative;}
+  .about-panel{
+    position:absolute;
+    top:calc(100% + 8px);
+    right:0;
+    z-index:950;
+    width:min(380px, 90vw);
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:8px;
+    box-shadow:0 14px 36px -10px rgba(19,33,24,0.4);
+    padding:18px 20px;
+    display:none;
+  }
+  .about-panel.open{display:block;}
+  .about-panel h3{
+    font-family:'Fraunces',serif;
+    font-size:16px;
+    margin:0 0 8px;
+    color:var(--ink);
+  }
+  .about-panel p{
+    font-size:12.5px;
+    line-height:1.6;
+    color:var(--ink);
+    margin:0 0 10px;
+  }
+  .about-panel ul{
+    margin:0 0 10px;
+    padding-left:18px;
+    font-size:12px;
+    color:var(--muted);
+    line-height:1.6;
+  }
+  .about-panel .about-fine{
+    font-size:11px;
+    color:var(--muted);
+    border-top:1px solid var(--line);
+    padding-top:10px;
+    margin:10px 0 0;
+  }
+  .hotspot-icon-wrap{
+    width:22px;
+    height:22px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#fff;
+    font-size:11px;
+    font-weight:700;
+    border:2px solid #fff;
+    box-shadow:0 2px 8px rgba(0,0,0,0.4);
+  }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip{
+    background:var(--panel);
+    color:var(--ink);
+  }
+  .hotspot-popup h4{
+    margin:0 0 4px;
+    font-family:'Fraunces',serif;
+    font-size:14.5px;
+  }
+  .hotspot-popup p{
+    margin:0 0 8px;
+    font-size:12px;
+    color:var(--muted);
+    line-height:1.5;
+  }
+  .hotspot-popup button{
+    background:var(--moss-dark);
+    color:#fbf9f2;
+    border:none;
+    padding:6px 12px;
+    border-radius:5px;
+    font-size:12px;
+    font-weight:600;
+    cursor:pointer;
+    font-family:'Inter',system-ui,sans-serif;
+  }
+  .app{
+    flex:1;
+    display:flex;
+    min-height:0;
+  }
+  .map-wrap{
+    flex:1;
+    min-width:0;
+    position:relative;
+  }
+  #map{
+    width:100%;
+    height:100%;
+  }
+  .map-search-box{
+    position:absolute;
+    top:16px;
+    left:50%;
+    transform:translateX(-50%);
+    z-index:900;
+    width:min(440px, calc(100% - 100px));
+    display:flex;
+    gap:6px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:6px;
+    box-shadow:0 10px 30px -8px rgba(19,33,24,0.35);
+  }
+  .map-search-box input{
+    flex:1;
+    border:none;
+    padding:8px 10px;
+    font-family:'Inter',system-ui,sans-serif;
+    font-size:13.5px;
+    color:var(--ink);
+    background:transparent;
+  }
+  .map-search-box input:focus{outline:none;}
+  .map-search-box button{
+    flex:none;
+    background:var(--moss-dark);
+    color:#fbf9f2;
+    border:none;
+    font-family:'Inter',system-ui,sans-serif;
+    font-size:13px;
+    font-weight:600;
+    padding:8px 16px;
+    border-radius:5px;
+    cursor:pointer;
+    transition:background .15s ease;
+  }
+  .map-search-box button:hover{background:var(--moss);}
+  .map-search-box button:disabled{background:var(--line); cursor:default;}
+  .address-suggestions{
+    position:absolute;
+    top:calc(100% + 6px);
+    left:0;
+    right:0;
+    z-index:901;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:8px;
+    box-shadow:0 10px 30px -8px rgba(19,33,24,0.35);
+    overflow:hidden;
+    display:none;
+  }
+  .address-suggestions.open{display:block;}
+  .address-suggestions button{
+    display:block;
+    width:100%;
+    text-align:left;
+    background:none;
+    border:none;
+    border-bottom:1px solid var(--line);
+    padding:10px 12px;
+    font-family:'Inter',system-ui,sans-serif;
+    font-size:13px;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  .address-suggestions button:last-child{border-bottom:none;}
+  .address-suggestions button:hover,
+  .address-suggestions button.active{background:color-mix(in srgb, var(--moss) 10%, var(--panel));}
+  .address-suggestions .suggestion-sub{
+    display:block;
+    font-size:11.5px;
+    color:var(--muted);
+    margin-top:2px;
+  }
+  .address-status{
+    position:absolute;
+    top:64px;
+    left:50%;
+    transform:translateX(-50%);
+    z-index:900;
+    width:min(440px, calc(100% - 100px));
+    text-align:center;
+    font-size:12.5px;
+    padding:0;
+  }
+  .address-status.error{
+    background:color-mix(in srgb, var(--severe) 20%, var(--panel));
+    color:var(--severe);
+    padding:7px 12px;
+    border-radius:6px;
+  }
+  .address-status.loading{
+    color:var(--muted);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    background:var(--panel);
+    padding:7px 12px;
+    border-radius:6px;
+    border:1px solid var(--line);
+  }
+  aside{
+    flex:1.05;
+    min-width:360px;
+    max-width:520px;
+    border-left:1px solid var(--line);
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+    background:var(--panel);
+    transition:flex-basis .3s ease, min-width .3s ease, max-width .3s ease;
+  }
+  aside.collapsed{
+    flex-grow:0;
+    flex-shrink:0;
+    flex-basis:0;
+    min-width:0;
+    max-width:0;
+    border-left:none;
+    overflow:hidden;
+  }
+  .sidebar-toggle{
+    position:absolute;
+    top:50%;
+    right:-14px;
+    transform:translateY(-50%);
+    z-index:950;
+    width:26px;
+    height:46px;
+    border-radius:6px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    color:var(--ink);
+    box-shadow:0 4px 14px -3px rgba(19,33,24,0.35);
+  }
+  .sidebar-toggle:hover{background:color-mix(in srgb, var(--moss) 10%, var(--panel));}
+  .sidebar-toggle svg{transition:transform .3s ease; transform:rotate(0deg);}
+  .sidebar-toggle.collapsed-icon svg{transform:rotate(180deg);}
+  .search-bar{
+    flex:none;
+    padding:18px 24px 14px;
+    border-bottom:1px solid var(--line);
+    background:var(--panel);
+  }
+  .search-bar label{
+    display:block;
+    font-size:11px;
+    font-weight:600;
+    text-transform:none;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+  .search-bar input{
+    width:100%;
+    padding:9px 12px;
+    border:1px solid var(--line);
+    border-radius:5px;
+    font-family:'Inter',system-ui,sans-serif;
+    font-size:13.5px;
+    color:var(--ink);
+    background:color-mix(in srgb, var(--panel) 92%, var(--ink));
+  }
+  .search-bar input:focus{
+    outline:2px solid var(--moss);
+    outline-offset:1px;
+    background:var(--panel);
+  }
+  .no-match{
+    color:var(--muted);
+    font-size:13px;
+    padding:14px 2px;
+    display:none;
+  }
+  #results{
+    flex:1;
+    min-height:0;
+    overflow-y:auto;
+    padding:18px 24px 40px;
+  }
+  .placeholder{
+    color:var(--muted);
+    font-size:14px;
+    line-height:1.6;
+    padding-top:10px;
+  }
+  .coords{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+    color:var(--moss-dark);
+    background:color-mix(in srgb, var(--moss) 10%, var(--panel));
+    border:1px solid var(--line);
+    padding:8px 10px;
+    border-radius:4px;
+    margin-bottom:18px;
+    display:inline-block;
+  }
+  .card{
+    border:1px solid var(--line);
+    border-radius:6px;
+    margin-bottom:10px;
+    overflow:hidden;
+    background:var(--panel);
+  }
+  .card-head{
+    padding:9px 12px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    border-bottom:1px solid var(--line);
+    cursor:pointer;
+    user-select:none;
+  }
+  .card-head:hover{background:color-mix(in srgb, var(--moss) 6%, transparent);}
+  .card.collapsed .card-head{border-bottom-color:transparent;}
+  .card-chevron{
+    flex:none;
+    color:var(--muted);
+    transition:transform .2s ease;
+    transform:rotate(0deg);
+  }
+  .card.collapsed .card-chevron{transform:rotate(-90deg);}
+  .card-title{
+    font-weight:600;
+    font-size:14.5px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .dot{width:9px;height:9px;border-radius:50%;flex:none;}
+  .band{
+    font-size:11.5px;
+    font-weight:600;
+    padding:3px 9px;
+    border-radius:20px;
+    white-space:nowrap;
+  }
+  .band.low{background:color-mix(in srgb, var(--low) 20%, var(--panel));color:var(--low);}
+  .band.moderate{background:color-mix(in srgb, var(--mod) 20%, var(--panel));color:var(--mod);}
+  .band.high{background:color-mix(in srgb, var(--high) 20%, var(--panel));color:var(--high);}
+  .band.severe{background:color-mix(in srgb, var(--severe) 20%, var(--panel));color:var(--severe);}
+  .band.unknown{background:color-mix(in srgb, var(--muted) 15%, var(--panel));color:var(--muted);}
+  .card-body{
+    padding:13px 14px 15px;
+    font-size:13px;
+    line-height:1.55;
+    color:var(--ink);
+    max-height:800px;
+    overflow:hidden;
+    transition:max-height .28s ease, padding .28s ease, opacity .2s ease;
+  }
+  .card.collapsed .card-body{
+    max-height:0;
+    padding-top:0;
+    padding-bottom:0;
+    opacity:0;
+  }
+  .card-body ul{margin:6px 0 0;padding-left:18px;}
+  .card-body li{margin-bottom:3px;}
+  .loading{
+    color:var(--muted);
+    font-size:13px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .spinner{
+    width:12px;height:12px;
+    border:2px solid var(--line);
+    border-top-color:var(--moss);
+    border-radius:50%;
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .error{color:var(--clay); font-size:12.5px;}
+  footer.disclaimer{
+    margin-top:6px;
+    padding:14px 16px;
+    background:color-mix(in srgb, var(--amber) 14%, var(--panel));
+    border:1px solid color-mix(in srgb, var(--amber) 35%, var(--panel));
+    border-radius:6px;
+    font-size:12px;
+    line-height:1.55;
+    color:color-mix(in srgb, var(--amber) 55%, var(--ink));
+  }
+  footer.disclaimer a{color:var(--moss-dark);}
+  .legend{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--muted);
+    margin-top:4px;
+  }
+  @media (max-width: 820px){
+    .app{flex-direction:column;}
+    aside{max-width:none; border-left:none; border-top:1px solid var(--line); transition:flex-basis .3s ease, min-height .3s ease;}
+    aside.collapsed{min-height:0; border-top:none;}
+    .map-wrap{height:46vh;}
+    .sidebar-toggle{
+      top:auto; right:50%; bottom:-14px; transform:translateX(50%);
+      width:46px; height:26px;
+    }
+    .sidebar-toggle svg{transform:rotate(90deg);}
+    .sidebar-toggle.collapsed-icon svg{transform:rotate(-90deg);}
+  }
+
+  /* ---------------- Home page ---------------- */
+  #home-view{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:40px 24px;
+    position:relative;
+    overflow:hidden;
+  }
+  #home-bg-map{
+    position:absolute;
+    inset:0;
+    z-index:0;
+    filter:saturate(0.75) brightness(0.94);
+    pointer-events:none;
+  }
+  .home-map-attribution{
+    position:absolute;
+    right:10px;
+    bottom:8px;
+    z-index:1;
+    font-size:10px;
+    color:var(--muted);
+    background:color-mix(in srgb, var(--panel) 75%, transparent);
+    padding:2px 6px;
+    border-radius:3px;
+    pointer-events:none;
+  }
+  .home-panel{
+    position:relative;
+    z-index:1;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:44px 48px;
+    box-shadow:0 18px 50px -20px rgba(19,33,24,0.35);
+  }
+  .home-inner{
+    max-width:720px;
+    width:100%;
+  }
+  .home-eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--moss);
+    margin:0 0 14px;
+  }
+  .home-inner h2{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:44px;
+    line-height:1.1;
+    margin:0 0 18px;
+    letter-spacing:-0.01em;
+    color:var(--ink);
+  }
+  .home-inner h2 em{
+    font-style:normal;
+    color:var(--moss);
+  }
+  .home-lede{
+    font-size:16px;
+    line-height:1.6;
+    color:color-mix(in srgb, var(--ink) 85%, var(--paper));
+    max-width:56ch;
+    margin:0 0 32px;
+  }
+  .hazard-legend{
+    list-style:none;
+    margin:0 0 36px;
+    padding:0;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px 28px;
+  }
+  .hazard-legend li{
+    display:flex;
+    align-items:baseline;
+    gap:9px;
+    font-size:14px;
+    color:color-mix(in srgb, var(--ink) 85%, var(--paper));
+    border-bottom:1px solid var(--line);
+    padding-bottom:9px;
+  }
+  .hazard-legend .dot{position:relative; top:-1px;}
+  .home-cta{
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    background:var(--moss-dark);
+    color:#fbf9f2;
+    border:none;
+    font-family:'Inter',system-ui,sans-serif;
+    font-size:15px;
+    font-weight:600;
+    padding:13px 22px;
+    border-radius:5px;
+    cursor:pointer;
+    transition:background .15s ease;
+  }
+  .home-cta:hover{background:var(--moss);}
+  .home-cta:focus-visible{outline:2px solid var(--moss); outline-offset:3px;}
+  .home-fine{
+    margin:18px 0 0;
+    font-size:12.5px;
+    color:var(--muted);
+    max-width:56ch;
+    line-height:1.6;
+  }
+  .home-back{
+    font-family:'Inter',system-ui,sans-serif;
+    font-size:13px;
+    color:var(--muted);
+    background:none;
+    border:none;
+    cursor:pointer;
+    padding:0;
+    text-decoration:underline;
+    text-underline-offset:2px;
+  }
+  .home-back:hover{color:var(--moss-dark);}
+  @media (max-width: 600px){
+    .home-inner h2{font-size:32px;}
+    .hazard-legend{grid-template-columns:1fr;}
+    .home-panel{padding:32px 26px;}
+  }
+
+  /* ---------------- Home page entrance animation ---------------- */
+  @keyframes fadeSlideUp{
+    from{opacity:0; transform:translateY(14px);}
+    to{opacity:1; transform:translateY(0);}
+  }
+  .home-eyebrow, .home-inner h2, .home-lede, .hazard-legend li, .home-cta, .home-fine{
+    opacity:0;
+    animation:fadeSlideUp .6s cubic-bezier(.2,.7,.3,1) forwards;
+  }
+  .home-eyebrow{animation-delay:.05s;}
+  .home-inner h2{animation-delay:.16s;}
+  .home-lede{animation-delay:.30s;}
+  .hazard-legend li:nth-child(1){animation-delay:.42s;}
+  .hazard-legend li:nth-child(2){animation-delay:.48s;}
+  .hazard-legend li:nth-child(3){animation-delay:.54s;}
+  .hazard-legend li:nth-child(4){animation-delay:.60s;}
+  .hazard-legend li:nth-child(5){animation-delay:.66s;}
+  .hazard-legend li:nth-child(6){animation-delay:.72s;}
+  .hazard-legend li:nth-child(7){animation-delay:.78s;}
+  .hazard-legend li:nth-child(8){animation-delay:.84s;}
+  .home-cta{animation-delay:.90s;}
+  .home-fine{animation-delay:1.02s;}
+  @media (prefers-reduced-motion: reduce){
+    .home-eyebrow, .home-inner h2, .home-lede, .hazard-legend li, .home-cta, .home-fine{
+      animation:none; opacity:1; transform:none;
+    }
+  }
+
+  /* ---------------- Home ⇄ app crossfade ---------------- */
+  #home-view{
+    transition:opacity .45s ease;
+    opacity:1;
+  }
+  #home-view.fading{opacity:0;}
+  header, .app{
+    opacity:0;
+    transition:opacity .45s ease;
+  }
+  header.visible, .app.visible{opacity:1;}
+  @media (prefers-reduced-motion: reduce){
+    #home-view, header, .app{transition:none;}
+  }
+</style>
+</head>
+<body>
+
+<div id="home-view">
+  <div id="home-bg-map"></div>
+  <div class="home-map-attribution">Tiles &copy; Esri</div>
+  <div class="home-panel">
+  <div class="home-inner">
+    <p class="home-eyebrow">Built from live public data, not a proprietary model</p>
+    <h2>Understand the <em>ground</em> you're standing on.</h2>
+    <p class="home-lede">Click anywhere in the world and pull live flood, wildfire, terrain, earthquake, heat, wind and storm signals for that exact point — drawn straight from free, public sources rather than a black-box score.</p>
+    <ul class="hazard-legend">
+      <li><span class="dot" style="background:var(--river)"></span>Flood</li>
+      <li><span class="dot" style="background:var(--amber)"></span>Wildfire weather</li>
+      <li><span class="dot" style="background:var(--clay)"></span>Terrain / landslide</li>
+      <li><span class="dot" style="background:var(--quake)"></span>Earthquake</li>
+      <li><span class="dot" style="background:var(--heat)"></span>Extreme heat</li>
+      <li><span class="dot" style="background:var(--wind)"></span>High wind / storm</li>
+      <li><span class="dot" style="background:var(--storm)"></span>Hurricane / typhoon / cyclone</li>
+      <li><span class="dot" style="background:var(--volcano)"></span>Volcano</li>
+    </ul>
+    <button class="home-cta" id="home-start-btn">Open the map</button>
+    <p class="home-fine">Educational tool, not an official hazard assessment. For anything that matters — buying property, insurance, safety planning — check your national flood, geological and meteorological agencies directly.</p>
+  </div>
+  </div>
+</div>
+
+<header style="display:none;">
+  <h1>Hazard <span>Detection</span></h1>
+  <div class="header-actions">
+    <button class="toolbar-btn" id="draw-area-btn" title="Draw an area to check">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="1" stroke-dasharray="4 3"/></svg>
+      Draw area
+    </button>
+    <button class="toolbar-btn" id="clear-area-btn" title="Clear the selected area" style="display:none;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l16 16M20 4L4 20"/></svg>
+      Clear area
+    </button>
+    <button class="toolbar-btn" id="hotspots-btn" title="Show the worst of each hazard right now">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="9" r="2.5"/><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/></svg>
+      <span id="hotspots-btn-text">Hotspots</span>
+    </button>
+    <button class="toolbar-btn" id="storms-btn" title="Show currently active storms">
+      🌀 <span id="storms-btn-text">Storms</span>
+    </button>
+    <button class="toolbar-btn" id="forecast-path-btn" title="Select a storm marker first" disabled>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17c4 0 4-10 8-10s4 10 8 10" stroke-dasharray="3 2.5"/></svg>
+      <span id="forecast-path-btn-text">Forecast path</span>
+    </button>
+    <button class="toolbar-btn" id="volcanoes-btn" title="Show known active volcanoes">
+      🌋 <span id="volcanoes-btn-text">Volcanoes</span>
+    </button>
+    <button class="toolbar-btn" id="erupting-only-btn" title="Show volcanoes first" disabled>
+      <span id="erupting-only-btn-text">Erupting only</span>
+    </button>
+    <div class="toolbar-divider"></div>
+    <span class="toolbar-section-label">Humanitarian</span>
+    <button class="toolbar-btn" id="conflicts-btn" title="Show known active conflicts">
+      ⚔️ <span id="conflicts-btn-text">Conflicts</span>
+    </button>
+    <div class="toolbar-divider"></div>
+    <button class="toolbar-btn" id="theme-toggle-btn" title="Toggle dark mode">
+      <span id="theme-toggle-icon">🌙</span> <span id="theme-toggle-text">Dark mode</span>
+    </button>
+    <div class="about-dropdown">
+      <button class="toolbar-btn" id="about-btn" title="About this tool">
+        About <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="about-panel" id="about-panel">
+        <h3>What this is</h3>
+        <p>Click anywhere in the world (or draw an area) to pull live flood, wildfire, terrain, earthquake, heat, wind and storm signals for that spot — built entirely from free, public data sources.</p>
+        <ul>
+          <li>Flood &amp; river data — UK Environment Agency (England only)</li>
+          <li>Wildfire weather, heat, wind — Open-Meteo forecasts</li>
+          <li>Terrain / landslide — Open-Meteo elevation + soil moisture, ISRIC soil type</li>
+          <li>Earthquake — USGS Earthquake Catalog</li>
+          <li>Hurricane / typhoon / cyclone — GDACS global disaster feed</li>
+          <li>Volcano — Smithsonian Global Volcanism Program, GDACS (current status)</li>
+          <li>War / conflict — curated list, cross-checked against current conflict trackers</li>
+        </ul>
+        <p class="about-fine">Educational tool, not an official hazard assessment. For anything that matters — buying property, insurance, safety planning — check your national flood, geological and meteorological agencies directly.</p>
+      </div>
+    </div>
+    <button class="home-back" id="home-back-btn">&larr; Back to overview</button>
+  </div>
+</header>
+
+<div class="app" style="display:none;">
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="map-search-box">
+      <input type="text" id="address-input" placeholder="Search for an address, city, or place…" autocomplete="off">
+      <button id="address-search-btn" aria-label="Search">Search</button>
+      <div class="address-suggestions" id="address-suggestions"></div>
+    </div>
+    <div class="address-status" id="address-status"></div>
+    <button class="sidebar-toggle" id="sidebar-toggle-btn" title="Hide sidebar" aria-label="Hide sidebar">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg>
+    </button>
+  </div>
+  <aside>
+    <div class="search-bar">
+      <label for="hazard-search">Search hazards</label>
+      <input type="text" id="hazard-search" placeholder="e.g. flood, wind, earthquake…" autocomplete="off">
+    </div>
+    <div id="results">
+      <div class="placeholder">
+        Click anywhere in the world to check it, or search for an address above.<br><br>
+        Wildfire weather, extreme heat, wind, earthquake, terrain and soil data work worldwide. Flood/river data only covers England (UK Environment Agency) — elsewhere it'll say so rather than guessing.
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+// ---------------------------------------------------------------
+// Country bounding boxes (ISO 3166-1 alpha-2 -> [name, [west, south, east, north]])
+// Used to look up the highest-ever recorded earthquake for the whole country a click
+// falls in, not just the local radius. Source: sandstrom/country-bounding-boxes (public domain-style dataset).
+// ---------------------------------------------------------------
+const COUNTRY_BBOXES={AF:['Afghanistan',[60.53,29.32,75.16,38.49]],AO:['Angola',[11.64,-17.93,24.08,-4.44]],AL:['Albania',[19.3,39.62,21.02,42.69]],AE:['United Arab Emirates',[51.58,22.5,56.4,26.06]],AR:['Argentina',[-73.42,-55.25,-53.63,-21.83]],AM:['Armenia',[43.58,38.74,46.51,41.25]],AQ:['Antarctica',[-180.0,-90.0,180.0,-63.27]],TF:['French Southern Territories',[68.72,-49.78,70.56,-48.63]],AU:['Australia',[113.34,-43.63,153.57,-10.67]],AT:['Austria',[9.48,46.43,16.98,49.04]],AZ:['Azerbaijan',[44.79,38.27,50.39,41.86]],BI:['Burundi',[29.02,-4.5,30.75,-2.35]],BE:['Belgium',[2.51,49.53,6.16,51.48]],BJ:['Benin',[0.77,6.14,3.8,12.24]],BF:['Burkina Faso',[-5.47,9.61,2.18,15.12]],BD:['Bangladesh',[88.08,20.67,92.67,26.45]],BG:['Bulgaria',[22.38,41.23,28.56,44.23]],BS:['Bahamas',[-78.98,23.71,-77.0,27.04]],BA:['Bosnia and Herzegovina',[15.75,42.65,19.6,45.23]],BY:['Belarus',[23.2,51.32,32.69,56.17]],BZ:['Belize',[-89.23,15.89,-88.11,18.5]],BO:['Bolivia',[-69.59,-22.87,-57.5,-9.76]],BR:['Brazil',[-73.99,-33.77,-34.73,5.24]],BN:['Brunei',[114.2,4.01,115.45,5.45]],BT:['Bhutan',[88.81,26.72,92.1,28.3]],BW:['Botswana',[19.9,-26.83,29.43,-17.66]],CF:['Central African Republic',[14.46,2.27,27.37,11.14]],CA:['Canada',[-141.0,41.68,-52.65,73.23]],CH:['Switzerland',[6.02,45.78,10.44,47.83]],CL:['Chile',[-75.64,-55.61,-66.96,-17.58]],CN:['China',[73.68,18.2,135.03,53.46]],CI:['Ivory Coast',[-8.6,4.34,-2.56,10.52]],CM:['Cameroon',[8.49,1.73,16.01,12.86]],CD:['Congo (Kinshasa)',[12.18,-13.26,31.17,5.26]],CG:['Congo (Brazzaville)',[11.09,-5.04,18.45,3.73]],CO:['Colombia',[-78.99,-4.3,-66.88,12.44]],CR:['Costa Rica',[-85.94,8.23,-82.55,11.22]],CU:['Cuba',[-84.97,19.86,-74.18,23.19]],CY:['Cyprus',[32.26,34.57,34.0,35.17]],CZ:['Czech Republic',[12.24,48.56,18.85,51.12]],DE:['Germany',[5.99,47.3,15.02,54.98]],DJ:['Djibouti',[41.66,10.93,43.32,12.7]],DK:['Denmark',[8.09,54.8,12.69,57.73]],DO:['Dominican Republic',[-71.95,17.6,-68.32,19.88]],DZ:['Algeria',[-8.68,19.06,12.0,37.12]],EC:['Ecuador',[-80.97,-4.96,-75.23,1.38]],EG:['Egypt',[24.7,22.0,36.87,31.59]],ER:['Eritrea',[36.32,12.46,43.08,18.0]],ES:['Spain',[-9.39,35.95,3.04,43.75]],EE:['Estonia',[23.34,57.47,28.13,59.61]],ET:['Ethiopia',[32.95,3.42,47.79,14.96]],FI:['Finland',[20.65,59.85,31.52,70.16]],FJ:['Fiji',[-180.0,-18.29,180.0,-16.02]],FK:['Falkland Islands',[-61.2,-52.3,-57.75,-51.1]],FR:['France',[-5.0,42.5,9.56,51.15]],GA:['Gabon',[8.8,-3.98,14.43,2.33]],GB:['United Kingdom',[-7.57,49.96,1.68,58.64]],GE:['Georgia',[39.96,41.06,46.64,43.55]],GH:['Ghana',[-3.24,4.71,1.06,11.1]],GN:['Guinea',[-15.13,7.31,-7.83,12.59]],GM:['Gambia',[-16.84,13.13,-13.84,13.88]],GW:['Guinea Bissau',[-16.68,11.04,-13.7,12.63]],GQ:['Equatorial Guinea',[9.31,1.01,11.29,2.28]],GR:['Greece',[20.15,34.92,26.6,41.83]],GL:['Greenland',[-73.3,60.04,-12.21,83.65]],GT:['Guatemala',[-92.23,13.74,-88.23,17.82]],GY:['Guyana',[-61.41,1.27,-56.54,8.37]],HN:['Honduras',[-89.35,12.98,-83.15,16.01]],HR:['Croatia',[13.66,42.48,19.39,46.5]],HT:['Haiti',[-74.46,18.03,-71.62,19.92]],HU:['Hungary',[16.2,45.76,22.71,48.62]],ID:['Indonesia',[95.29,-10.36,141.03,5.48]],IN:['India',[68.18,7.97,97.4,35.49]],IE:['Ireland',[-9.98,51.67,-6.03,55.13]],IR:['Iran',[44.11,25.08,63.32,39.71]],IQ:['Iraq',[38.79,29.1,48.57,37.39]],IS:['Iceland',[-24.33,63.5,-13.61,66.53]],IL:['Israel',[34.27,29.5,35.84,33.28]],IT:['Italy',[6.75,36.62,18.48,47.12]],JM:['Jamaica',[-78.34,17.7,-76.2,18.52]],JO:['Jordan',[34.92,29.2,39.2,33.38]],JP:['Japan',[129.41,31.03,145.54,45.55]],KZ:['Kazakhstan',[46.47,40.66,87.36,55.39]],KE:['Kenya',[33.89,-4.68,41.86,5.51]],KG:['Kyrgyzstan',[69.46,39.28,80.26,43.3]],KH:['Cambodia',[102.35,10.49,107.61,14.57]],KR:['South Korea',[126.12,34.39,129.47,38.61]],KW:['Kuwait',[46.57,28.53,48.42,30.06]],LA:['Laos',[100.12,13.88,107.56,22.46]],LB:['Lebanon',[35.13,33.09,36.61,34.64]],LR:['Liberia',[-11.44,4.36,-7.54,8.54]],LY:['Libya',[9.32,19.58,25.16,33.14]],LK:['Sri Lanka',[79.7,5.97,81.79,9.82]],LS:['Lesotho',[27.0,-30.65,29.33,-28.65]],LT:['Lithuania',[21.06,53.91,26.59,56.37]],LU:['Luxembourg',[5.67,49.44,6.24,50.13]],LV:['Latvia',[21.06,55.62,28.18,57.97]],MA:['Morocco',[-17.02,21.42,-1.12,35.76]],MD:['Moldova',[26.62,45.49,30.02,48.47]],MG:['Madagascar',[43.25,-25.6,50.48,-12.04]],MX:['Mexico',[-117.13,14.54,-86.81,32.72]],MK:['Macedonia',[20.46,40.84,22.95,42.32]],ML:['Mali',[-12.17,10.1,4.27,24.97]],MM:['Myanmar',[92.3,9.93,101.18,28.34]],ME:['Montenegro',[18.45,41.88,20.34,43.52]],MN:['Mongolia',[87.75,41.6,119.77,52.05]],MZ:['Mozambique',[30.18,-26.74,40.78,-10.32]],MR:['Mauritania',[-17.06,14.62,-4.92,27.4]],MW:['Malawi',[32.69,-16.8,35.77,-9.23]],MY:['Malaysia',[100.09,0.77,119.18,6.93]],NA:['Namibia',[11.73,-29.05,25.08,-16.94]],NC:['New Caledonia',[164.03,-22.4,167.12,-20.11]],NE:['Niger',[0.3,11.66,15.9,23.47]],NG:['Nigeria',[2.69,4.24,14.58,13.87]],NI:['Nicaragua',[-87.67,10.73,-83.15,15.02]],NL:['Netherlands',[3.31,50.8,7.09,53.51]],NO:['Norway',[4.99,58.08,31.29,70.92]],NP:['Nepal',[80.09,26.4,88.17,30.42]],NZ:['New Zealand',[166.51,-46.64,178.52,-34.45]],OM:['Oman',[52.0,16.65,59.81,26.4]],PK:['Pakistan',[60.87,23.69,77.84,37.13]],PA:['Panama',[-82.97,7.22,-77.24,9.61]],PE:['Peru',[-81.41,-18.35,-68.67,-0.06]],PH:['Philippines',[117.17,5.58,126.54,18.51]],PG:['Papua New Guinea',[141.0,-10.65,156.02,-2.5]],PL:['Poland',[14.07,49.03,24.03,54.85]],PR:['Puerto Rico',[-67.24,17.95,-65.59,18.52]],KP:['North Korea',[124.27,37.67,130.78,42.99]],PT:['Portugal',[-9.53,36.84,-6.39,42.28]],PY:['Paraguay',[-62.69,-27.55,-54.29,-19.34]],QA:['Qatar',[50.74,24.56,51.61,26.11]],RO:['Romania',[20.22,43.69,29.63,48.22]],RU:['Russia',[-180.0,41.15,180.0,81.25]],RW:['Rwanda',[29.02,-2.92,30.82,-1.13]],SA:['Saudi Arabia',[34.63,16.35,55.67,32.16]],SD:['Sudan',[21.94,8.62,38.41,22.0]],SS:['South Sudan',[23.89,3.51,35.3,12.25]],SN:['Senegal',[-17.63,12.33,-11.47,16.6]],SB:['Solomon Islands',[156.49,-10.83,162.4,-6.6]],SL:['Sierra Leone',[-13.25,6.79,-10.23,10.05]],SV:['El Salvador',[-90.1,13.15,-87.72,14.42]],SO:['Somalia',[40.98,-1.68,51.13,12.02]],RS:['Serbia',[18.83,42.25,22.99,46.17]],SR:['Suriname',[-58.04,1.82,-53.96,6.03]],SK:['Slovakia',[16.88,47.76,22.56,49.57]],SI:['Slovenia',[13.7,45.45,16.56,46.85]],SE:['Sweden',[11.03,55.36,23.9,69.11]],SZ:['Swaziland',[30.68,-27.29,32.07,-25.66]],SY:['Syria',[35.7,32.31,42.35,37.23]],TD:['Chad',[13.54,7.42,23.89,23.41]],TG:['Togo',[-0.05,5.93,1.87,11.02]],TH:['Thailand',[97.38,5.69,105.59,20.42]],TJ:['Tajikistan',[67.44,36.74,74.98,40.96]],TM:['Turkmenistan',[52.5,35.27,66.55,42.75]],TL:['East Timor',[124.97,-9.39,127.34,-8.27]],TT:['Trinidad and Tobago',[-61.95,10.0,-60.9,10.89]],TN:['Tunisia',[7.52,30.31,11.49,37.35]],TR:['Turkey',[26.04,35.82,44.79,42.14]],TW:['Taiwan',[120.11,21.97,121.95,25.3]],TZ:['Tanzania',[29.34,-11.72,40.32,-0.95]],UG:['Uganda',[29.58,-1.44,35.04,4.25]],UA:['Ukraine',[22.09,44.36,40.08,52.34]],UY:['Uruguay',[-58.43,-34.95,-53.21,-30.11]],US:['United States',[-125.0,25.0,-66.96,49.5]],UZ:['Uzbekistan',[55.93,37.14,73.06,45.59]],VE:['Venezuela',[-73.3,0.72,-59.76,12.16]],VN:['Vietnam',[102.17,8.6,109.34,23.35]],VU:['Vanuatu',[166.63,-16.6,167.84,-14.63]],PS:['West Bank',[34.93,31.35,35.55,32.53]],YE:['Yemen',[42.6,12.59,53.11,19.0]],ZA:['South Africa',[16.34,-34.82,32.83,-22.09]],ZM:['Zambia',[21.89,-17.96,33.49,-8.24]],ZW:['Zimbabwe',[25.26,-22.27,32.85,-15.51]]};
+
+// ---------------------------------------------------------------
+// Prevent grey borders at low zoom: the world's tile image is a fixed
+// square (256 * 2^zoom px), so if the map container is wider or taller
+// than that, empty grey shows around the edges. This works out, from the
+// container's real pixel size, the lowest zoom that still fully covers it.
+// ---------------------------------------------------------------
+function fitMinZoomToContainer(m){
+  const size = m.getSize();
+  if(!size || size.x < 10 || size.y < 10) return; // container not visible/sized yet
+  const worldTileSize = 256;
+  const neededZoom = Math.ceil(Math.log2(Math.max(size.x, size.y) / worldTileSize));
+  m.setMinZoom(Math.max(2, neededZoom));
+}
+
+// ---------------------------------------------------------------
+// Map setup
+// ---------------------------------------------------------------
+const map = L.map('map', {
+  zoomControl: true,
+  worldCopyJump: true
+}).setView([20, 10], 2); // global default view
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ',
+  maxZoom: 18
+}).addTo(map);
+
+// ---------------------------------------------------------------
+// Decorative background map behind the home page panel — purely visual,
+// every interaction is disabled so it can never be dragged, zoomed, or clicked.
+// ---------------------------------------------------------------
+const homeBgMap = L.map('home-bg-map', {
+  zoomControl: false,
+  attributionControl: false,
+  dragging: false,
+  touchZoom: false,
+  doubleClickZoom: false,
+  scrollWheelZoom: false,
+  boxZoom: false,
+  keyboard: false,
+  tap: false,
+  worldCopyJump: false,
+  maxBounds: [[-90, -180], [90, 180]],
+  maxBoundsViscosity: 1.0
+}).setView([20, 10], 2.6);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 18,
+  noWrap: true
+}).addTo(homeBgMap);
+setTimeout(() => fitMinZoomToContainer(homeBgMap), 50);
+
+let marker = null;
+
+// ---------------------------------------------------------------
+// Home page toggle
+// ---------------------------------------------------------------
+const homeView = document.getElementById('home-view');
+const headerEl = document.querySelector('header');
+const appEl = document.querySelector('.app');
+
+document.getElementById('home-start-btn').addEventListener('click', () => {
+  homeView.classList.add('fading');
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const fadeMs = prefersReducedMotion ? 0 : 450;
+  setTimeout(() => {
+    homeView.style.display = 'none';
+    headerEl.style.display = 'flex';
+    appEl.style.display = 'flex';
+    // Force a reflow so the browser registers the elements as visible-but-transparent
+    // before the opacity transition starts, otherwise it can just snap straight to visible.
+    void headerEl.offsetWidth;
+    headerEl.classList.add('visible');
+    appEl.classList.add('visible');
+    // The map was initialised while its container was hidden (display:none),
+    // so Leaflet has no idea how big it actually is until told to recheck.
+    setTimeout(() => {
+      map.invalidateSize();
+      fitMinZoomToContainer(map);
+    }, 50);
+  }, fadeMs);
+});
+
+document.getElementById('home-back-btn').addEventListener('click', () => {
+  headerEl.classList.remove('visible');
+  appEl.classList.remove('visible');
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const fadeMs = prefersReducedMotion ? 0 : 450;
+  setTimeout(() => {
+    headerEl.style.display = 'none';
+    appEl.style.display = 'none';
+    homeView.style.display = 'flex';
+    void homeView.offsetWidth;
+    homeView.classList.remove('fading');
+  }, fadeMs);
+});
+
+// Recalculate on window resize, for whichever map(s) are actually visible right now
+window.addEventListener('resize', () => {
+  fitMinZoomToContainer(homeBgMap);
+  if(appEl.style.display !== 'none') fitMinZoomToContainer(map);
+});
+
+// ---------------------------------------------------------------
+// Sidebar toggle — slides the results panel in and out, giving the map
+// the full width when it's not needed.
+// ---------------------------------------------------------------
+const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
+const sidebarAside = document.querySelector('aside');
+let sidebarCollapsed = false;
+
+sidebarToggleBtn.addEventListener('click', () => {
+  sidebarCollapsed = !sidebarCollapsed;
+  sidebarAside.classList.toggle('collapsed', sidebarCollapsed);
+  sidebarToggleBtn.classList.toggle('collapsed-icon', sidebarCollapsed);
+  sidebarToggleBtn.title = sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar';
+  sidebarToggleBtn.setAttribute('aria-label', sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar');
+  // The map's container just resized (animating over ~0.3s) — recheck its
+  // size once the transition settles, same fix needed when it first appears.
+  setTimeout(() => {
+    map.invalidateSize();
+    fitMinZoomToContainer(map);
+  }, 320);
+});
+
+// ---------------------------------------------------------------
+// Theme toggle — persisted in localStorage so it's remembered on return visits.
+// (This page is hosted normally, outside any sandboxed preview, so localStorage
+// works as expected here.)
+// ---------------------------------------------------------------
+const themeToggleBtn = document.getElementById('theme-toggle-btn');
+const themeToggleIcon = document.getElementById('theme-toggle-icon');
+const themeToggleText = document.getElementById('theme-toggle-text');
+
+function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  themeToggleIcon.textContent = theme === 'dark' ? '☀️' : '🌙';
+  themeToggleText.textContent = theme === 'dark' ? 'Light mode' : 'Dark mode';
+  try{ localStorage.setItem('hazard-detection-theme', theme); } catch(e){ /* ignore if storage is unavailable */ }
+}
+
+(function initTheme(){
+  let saved = 'light';
+  try{ saved = localStorage.getItem('hazard-detection-theme') || 'light'; } catch(e){ /* default to light */ }
+  applyTheme(saved);
+})();
+
+themeToggleBtn.addEventListener('click', () => {
+  const current = document.documentElement.getAttribute('data-theme');
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+});
+
+// ---------------------------------------------------------------
+// About dropdown
+// ---------------------------------------------------------------
+const aboutBtn = document.getElementById('about-btn');
+const aboutPanel = document.getElementById('about-panel');
+
+aboutBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  aboutPanel.classList.toggle('open');
+});
+
+document.addEventListener('click', (e) => {
+  if(aboutPanel.classList.contains('open') && !e.target.closest('.about-dropdown')){
+    aboutPanel.classList.remove('open');
+  }
+});
+
+
+// ---------------------------------------------------------------
+// Shared "go to this location" logic — used by both a map click and an
+// address search, so marker placement and the hazard check stay in sync.
+// ---------------------------------------------------------------
+function goToLocation(lat, lng, zoom){
+  if(typeof areaActive !== 'undefined' && areaActive) clearArea(); // switching to a point supersedes a drawn area
+  if (marker) marker.remove();
+  marker = L.marker([lat, lng]).addTo(map);
+  if (zoom !== undefined) map.setView([lat, lng], zoom);
+  runCheck(lat, lng);
+}
+
+map.on('click', (e) => {
+  if(drawMode || areaActive) return; // drawing in progress, or an area is currently selected
+  goToLocation(e.latlng.lat, e.latlng.lng);
+});
+
+// Attribution for the geocoding data itself, separate from the tile attribution above
+map.attributionControl.addAttribution('Geocoding by <a href="https://photon.komoot.io" target="_blank" rel="noopener">Photon</a> (Komoot, built on OpenStreetMap data)');
+
+// ---------------------------------------------------------------
+// Draw-an-area tool — click the toolbar button, then click-and-drag to
+// draw an initial rectangle. Runs the same hazard checks against that area
+// instead of a single point (see runAreaCheck). While an area is selected,
+// ordinary map clicks are ignored (areaActive) rather than silently
+// overwriting the area's results with a single-point check.
+// ---------------------------------------------------------------
+const drawAreaBtn = document.getElementById('draw-area-btn');
+const clearAreaBtn = document.getElementById('clear-area-btn');
+let drawMode = false;
+let areaActive = false;
+let drawStart = null;
+let drawRect = null; // an L.polygon once drawn, despite the name (kept for minimal disruption elsewhere)
+let areaPoints = []; // the polygon's vertices, in order, as L.LatLng
+
+function enterDrawMode(){
+  drawMode = true;
+  map.dragging.disable();
+  map.getContainer().style.cursor = 'crosshair';
+  drawAreaBtn.classList.add('active');
+  drawAreaBtn.lastChild.textContent = ' Click & drag on the map';
+}
+
+function exitDrawMode(){
+  drawMode = false;
+  drawStart = null;
+  map.dragging.enable();
+  map.getContainer().style.cursor = '';
+  drawAreaBtn.classList.remove('active');
+  drawAreaBtn.lastChild.textContent = ' Draw area';
+}
+
+// ---------------------------------------------------------------
+// Shape handles — a true polygon editor, not just a resizable box. Every
+// vertex is its own marker that moves freely in any direction, so the
+// shape can be genuinely molded rather than only stretched on axis. A
+// smaller handle sits at the midpoint of each edge; dragging one of those
+// inserts a brand new point into the polygon right there, so the shape can
+// grow more detailed with as many points as the person wants to add.
+// Dragging live-updates the outline (cheap); letting go re-runs the hazard
+// checks against the new shape, not on every pixel of movement.
+// ---------------------------------------------------------------
+let shapeHandles = []; // { marker, kind: 'vertex'|'midpoint', index }
+
+function vertexIcon(){
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:14px;height:14px;border-radius:50%;background:var(--panel);border:2.5px solid var(--moss);box-shadow:0 2px 6px rgba(0,0,0,0.35);cursor:grab;"></div>`,
+    iconSize: [14, 14], iconAnchor: [7, 7]
+  });
+}
+
+function midpointIcon(){
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:10px;height:10px;border-radius:50%;background:var(--panel);border:2px solid color-mix(in srgb, var(--moss) 60%, var(--muted));box-shadow:0 2px 5px rgba(0,0,0,0.3);cursor:copy;"></div>`,
+    iconSize: [10, 10], iconAnchor: [5, 5]
+  });
+}
+
+function midpointLatLng(a, b){
+  return L.latLng((a.lat + b.lat) / 2, (a.lng + b.lng) / 2);
+}
+
+function clearShapeHandles(){
+  shapeHandles.forEach(h => map.removeLayer(h.marker));
+  shapeHandles = [];
+}
+
+// Rebuilds every handle from the current areaPoints — called after any
+// change finishes, so vertex and midpoint handles are always in sync with
+// however many points the shape currently has.
+function rebuildShapeHandles(){
+  clearShapeHandles();
+
+  areaPoints.forEach((pt, i) => {
+    const marker = L.marker(pt, { icon: vertexIcon(), draggable: true, zIndexOffset: 1000 }).addTo(map);
+    marker.on('drag', () => {
+      areaPoints[i] = marker.getLatLng();
+      drawRect.setLatLngs(areaPoints);
+    });
+    marker.on('dragend', () => {
+      areaPoints[i] = marker.getLatLng();
+      drawRect.setLatLngs(areaPoints);
+      rebuildShapeHandles();
+      runAreaCheck(areaPoints);
+    });
+    shapeHandles.push({ marker, kind: 'vertex', index: i });
+  });
+
+  areaPoints.forEach((pt, i) => {
+    const next = areaPoints[(i + 1) % areaPoints.length];
+    const marker = L.marker(midpointLatLng(pt, next), { icon: midpointIcon(), draggable: true, zIndexOffset: 900 }).addTo(map);
+    let inserted = false;
+    let insertedIndex = null;
+
+    marker.on('dragstart', () => {
+      // The first move turns this midpoint into a brand new real vertex,
+      // inserted between the two points it was sitting between.
+      insertedIndex = i + 1;
+      areaPoints.splice(insertedIndex, 0, marker.getLatLng());
+      inserted = true;
+    });
+    marker.on('drag', () => {
+      if(!inserted) return;
+      areaPoints[insertedIndex] = marker.getLatLng();
+      drawRect.setLatLngs(areaPoints);
+    });
+    marker.on('dragend', () => {
+      if(inserted){
+        areaPoints[insertedIndex] = marker.getLatLng();
+        drawRect.setLatLngs(areaPoints);
+      }
+      rebuildShapeHandles();
+      runAreaCheck(areaPoints);
+    });
+    shapeHandles.push({ marker, kind: 'midpoint', index: i });
+  });
+}
+
+function clearArea(){
+  if(drawRect){ map.removeLayer(drawRect); drawRect = null; }
+  clearShapeHandles();
+  areaPoints = [];
+  areaActive = false;
+  clearAreaBtn.style.display = 'none';
+  panel.innerHTML = `
+    <div class="placeholder">
+      Click anywhere in the world to check it, search for an address above, or draw an area.<br><br>
+      Wildfire weather, extreme heat, wind, earthquake, terrain and soil data work worldwide. Flood/river data only covers England (UK Environment Agency) — elsewhere it'll say so rather than guessing.
+    </div>
+  `;
+}
+
+drawAreaBtn.addEventListener('click', () => {
+  if(drawMode){ exitDrawMode(); return; }
+  if(areaActive) clearArea(); // starting a fresh draw replaces any existing area
+  enterDrawMode();
+});
+
+clearAreaBtn.addEventListener('click', clearArea);
+
+map.on('mousedown', (e) => {
+  if(!drawMode) return;
+  drawStart = e.latlng;
+  if(drawRect){ map.removeLayer(drawRect); drawRect = null; }
+});
+
+map.on('mousemove', (e) => {
+  if(!drawMode || !drawStart) return;
+  const bounds = L.latLngBounds(drawStart, e.latlng);
+  const corners = [bounds.getNorthWest(), bounds.getNorthEast(), bounds.getSouthEast(), bounds.getSouthWest()];
+  if(drawRect) drawRect.setLatLngs(corners);
+  else drawRect = L.polygon(corners, { color: '#3c5a44', weight: 2, fillColor: '#3c5a44', fillOpacity: 0.15 }).addTo(map);
+});
+
+map.on('mouseup', (e) => {
+  if(!drawMode || !drawStart) return;
+  const bounds = L.latLngBounds(drawStart, e.latlng);
+  exitDrawMode();
+  // A drawn area replaces the single-point marker while it's active
+  if(marker){ marker.remove(); marker = null; }
+  // Too small a drag (essentially a click) isn't a meaningful area — treat it as a normal point check instead
+  const ne = bounds.getNorthEast(), sw = bounds.getSouthWest();
+  if(distanceKm(sw.lat, sw.lng, ne.lat, ne.lng) < 0.5){
+    if(drawRect){ map.removeLayer(drawRect); drawRect = null; }
+    goToLocation(bounds.getCenter().lat, bounds.getCenter().lng);
+    return;
+  }
+  areaPoints = [bounds.getNorthWest(), bounds.getNorthEast(), bounds.getSouthEast(), bounds.getSouthWest()];
+  drawRect.setLatLngs(areaPoints);
+  areaActive = true;
+  clearAreaBtn.style.display = 'inline-flex';
+  rebuildShapeHandles();
+  runAreaCheck(areaPoints);
+});
+
+// ---------------------------------------------------------------
+// HOTSPOTS — shows the worst of each hazard category right now, as small
+// coloured markers on the map. Honesty note built into how this is built:
+// there is no free API that scans literally every point on Earth, so this
+// mixes two genuinely different kinds of "worst":
+//   - Earthquake, flood, wildfire, cyclone: real worst ACTIVE EVENT from a
+//     genuine global live feed (USGS significant-earthquakes feed, GDACS).
+//   - Heat, wind, landslide: worst among a CURATED list of locations
+//     (major world cities; known landslide-prone regions) checked live —
+//     not a scan of the whole globe. Each popup says which kind it is.
+// ---------------------------------------------------------------
+const HOTSPOT_CITIES = [
+  ['Phoenix, USA', 33.4484, -112.0740], ['Death Valley, USA', 36.5323, -116.9325],
+  ['Houston, USA', 29.7604, -95.3698], ['Miami, USA', 25.7617, -80.1918],
+  ['Los Angeles, USA', 34.0522, -118.2437], ['New York, USA', 40.7128, -74.0060],
+  ['Mexico City, Mexico', 19.4326, -99.1332], ['São Paulo, Brazil', -23.5505, -46.6333],
+  ['Buenos Aires, Argentina', -34.6037, -58.3816], ['London, UK', 51.5074, -0.1278],
+  ['Paris, France', 48.8566, 2.3522], ['Moscow, Russia', 55.7558, 37.6173],
+  ['Cairo, Egypt', 30.0444, 31.2357], ['Lagos, Nigeria', 6.5244, 3.3792],
+  ['Nairobi, Kenya', -1.2921, 36.8219], ['Cape Town, South Africa', -33.9249, 18.4241],
+  ['Riyadh, Saudi Arabia', 24.7136, 46.6753], ['Baghdad, Iraq', 33.3152, 44.3661],
+  ['Basra, Iraq', 30.5085, 47.7835], ['Dubai, UAE', 25.2048, 55.2708],
+  ['Karachi, Pakistan', 24.8607, 67.0011], ['Delhi, India', 28.6139, 77.2090],
+  ['Kolkata, India', 22.5726, 88.3639], ['Bangkok, Thailand', 13.7563, 100.5018],
+  ['Jakarta, Indonesia', -6.2088, 106.8456], ['Manila, Philippines', 14.5995, 120.9842],
+  ['Beijing, China', 39.9042, 116.4074], ['Tokyo, Japan', 35.6762, 139.6503],
+  ['Ulaanbaatar, Mongolia', 47.8864, 106.9057], ['Sydney, Australia', -33.8688, 151.2093],
+  ['Darwin, Australia', -12.4634, 130.8456], ['Reykjavik, Iceland', 64.1466, -21.9426],
+  ['Anchorage, USA', 61.2181, -149.9003],
+];
+
+const LANDSLIDE_HOTSPOTS = [
+  ['Rio de Janeiro hillsides, Brazil', -22.9068, -43.1729],
+  ['Cherrapunji, India', 25.3000, 91.7000],
+  ['Kerala hills, India', 10.8505, 76.2711],
+  ['Sichuan, China', 30.6600, 104.0633],
+  ['Yunnan, China', 25.0000, 102.7000],
+  ['Chittagong hills, Bangladesh', 22.3569, 91.7832],
+  ['Leyte, Philippines', 10.8000, 124.8000],
+  ['Kathmandu hills, Nepal', 27.7172, 85.3240],
+  ['Medellín, Colombia', 6.2442, -75.5812],
+  ['Cusco region, Peru', -13.5319, -71.9675],
+  ['Bududa, Uganda', 1.0200, 34.3300],
+  ['West Pokot, Kenya', 1.6000, 35.1000],
+  ['Campania, Italy', 40.8500, 14.2500],
+  ['Hiroshima hills, Japan', 34.3853, 132.4553],
+  ['West Java, Indonesia', -6.9147, 107.6098],
+];
+
+const hotspotsLayer = L.layerGroup();
+const hotspotsBtn = document.getElementById('hotspots-btn');
+const hotspotsBtnText = document.getElementById('hotspots-btn-text');
+let hotspotsLoaded = false;
+let hotspotsVisible = false;
+
+function hotspotIcon(color, symbol){
+  return L.divIcon({
+    className: '',
+    html: `<div class="hotspot-icon-wrap" style="background:${color};">${symbol}</div>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+    popupAnchor: [0, -11]
+  });
+}
+
+function addHotspotMarker(lat, lng, color, symbol, title, detail, kindNote){
+  const icon = hotspotIcon(color, symbol);
+  const m = L.marker([lat, lng], { icon }).addTo(hotspotsLayer);
+  const popupId = `hotspot-check-${Math.round(lat*1000)}-${Math.round(lng*1000)}`;
+  m.bindPopup(
+    `<div class="hotspot-popup">
+      <h4>${title}</h4>
+      <p>${detail}</p>
+      <p style="font-size:11px;">${kindNote}</p>
+      <button id="${popupId}">Check this point</button>
+    </div>`
+  );
+  m.on('popupopen', () => {
+    const btn = document.getElementById(popupId);
+    if(btn) btn.addEventListener('click', () => { map.closePopup(); goToLocation(lat, lng, 8); });
+  });
+}
+
+// --- Earthquake: real global "significant earthquakes, past week" USGS feed ---
+async function findWorstEarthquake(){
+  try{
+    const res = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/significant_week.geojson');
+    if(!res.ok) throw new Error(`USGS returned ${res.status}`);
+    const data = await res.json();
+    const features = data.features || [];
+    if(!features.length) return;
+    features.sort((a, b) => b.properties.mag - a.properties.mag);
+    const top = features[0];
+    const [lon, lat] = top.geometry.coordinates;
+    const dateStr = new Date(top.properties.time).toISOString().slice(0, 10);
+    addHotspotMarker(lat, lon, getComputedStyle(document.documentElement).getPropertyValue('--quake').trim(), '⬤',
+      `Worst earthquake this week`,
+      `M${top.properties.mag.toFixed(1)} — ${top.properties.place || ''} (${dateStr})`,
+      'Real event — USGS significant earthquakes feed, past 7 days.'
+    );
+  } catch(e){ /* skip this category if it fails — the rest can still show */ }
+}
+
+// --- Flood, wildfire, cyclone: worst active event from the GDACS global feed ---
+function alertRank(level){ return level === 'Red' ? 3 : level === 'Orange' ? 2 : level === 'Green' ? 1 : 0; }
+
+function pickWorstGdacs(features, type){
+  const matches = features.filter(f => f.properties.eventtype === type);
+  if(!matches.length) return null;
+  matches.sort((a, b) => {
+    const r = alertRank(b.properties.alertlevel) - alertRank(a.properties.alertlevel);
+    if(r !== 0) return r;
+    const sa = (a.properties.severitydata && a.properties.severitydata.severity) || 0;
+    const sb = (b.properties.severitydata && b.properties.severitydata.severity) || 0;
+    return sb - sa;
+  });
+  return matches[0];
+}
+
+async function findWorstGdacsEvents(){
+  try{
+    const res = await fetch('https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?alertlevel=green;orange;red');
+    if(!res.ok) throw new Error(`GDACS returned ${res.status}`);
+    const data = await res.json();
+    const features = data.features || [];
+
+    const flood = pickWorstGdacs(features, 'FL');
+    if(flood){
+      const [lon, lat] = flood.geometry.coordinates;
+      addHotspotMarker(lat, lon, getComputedStyle(document.documentElement).getPropertyValue('--river').trim(), '⬤',
+        'Worst active flood',
+        `${flood.properties.eventname || flood.properties.country || 'Flood event'} — ${flood.properties.alertlevel} alert`,
+        'Real active event — GDACS global disaster feed.'
+      );
+    }
+    const wildfire = pickWorstGdacs(features, 'WF');
+    if(wildfire){
+      const [lon, lat] = wildfire.geometry.coordinates;
+      addHotspotMarker(lat, lon, getComputedStyle(document.documentElement).getPropertyValue('--amber').trim(), '⬤',
+        'Worst active wildfire',
+        `${wildfire.properties.eventname || wildfire.properties.country || 'Wildfire event'} — ${wildfire.properties.alertlevel} alert`,
+        'Real active event — GDACS global disaster feed.'
+      );
+    }
+    const cyclone = pickWorstGdacs(features, 'TC');
+    if(cyclone){
+      const [lon, lat] = cyclone.geometry.coordinates;
+      const label = regionalStormName(lat, lon);
+      addHotspotMarker(lat, lon, getComputedStyle(document.documentElement).getPropertyValue('--storm').trim(), '⬤',
+        `Worst active ${label.toLowerCase()}`,
+        `${cyclone.properties.eventname || 'Storm'} — ${cyclone.properties.alertlevel} alert`,
+        'Real active event — GDACS global disaster feed.'
+      );
+    }
+  } catch(e){ /* skip these categories if it fails */ }
+}
+
+// --- Heat & wind: worst among the curated major-city list, checked live ---
+async function findWorstHeatAndWind(){
+  try{
+    const lats = HOTSPOT_CITIES.map(c => c[1]).join(',');
+    const lngs = HOTSPOT_CITIES.map(c => c[2]).join(',');
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lngs}` +
+      `&current=temperature_2m,wind_gusts_10m&timezone=auto`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error(`Weather API returned ${res.status}`);
+    const data = await res.json();
+    // Multiple locations come back as an array; a single location would come back as one object
+    const results = Array.isArray(data) ? data : [data];
+
+    let hottest = null, windiest = null;
+    results.forEach((r, i) => {
+      if(!r.current) return;
+      const city = HOTSPOT_CITIES[i];
+      const temp = r.current.temperature_2m;
+      const gust = r.current.wind_gusts_10m;
+      if(temp != null && (!hottest || temp > hottest.temp)) hottest = { city, temp };
+      if(gust != null && (!windiest || gust > windiest.gust)) windiest = { city, gust };
+    });
+
+    if(hottest){
+      addHotspotMarker(hottest.city[1], hottest.city[2], getComputedStyle(document.documentElement).getPropertyValue('--heat').trim(), '⬤',
+        'Hottest tracked city right now',
+        `${hottest.city[0]} — ${hottest.temp.toFixed(1)}°C currently`,
+        `Worst among ${HOTSPOT_CITIES.length} major cities checked live — not a full global scan.`
+      );
+    }
+    if(windiest){
+      addHotspotMarker(windiest.city[1], windiest.city[2], getComputedStyle(document.documentElement).getPropertyValue('--wind').trim(), '⬤',
+        'Windiest tracked city right now',
+        `${windiest.city[0]} — ${windiest.gust.toFixed(0)} km/h gusts currently`,
+        `Worst among ${HOTSPOT_CITIES.length} major cities checked live — not a full global scan.`
+      );
+    }
+  } catch(e){ /* skip these categories if it fails */ }
+}
+
+// --- Landslide: worst among curated known landslide-prone regions, ranked by live rainfall + soil saturation ---
+async function findWorstLandslide(){
+  try{
+    const lats = LANDSLIDE_HOTSPOTS.map(c => c[1]).join(',');
+    const lngs = LANDSLIDE_HOTSPOTS.map(c => c[2]).join(',');
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lngs}` +
+      `&hourly=soil_moisture_0_to_1cm&daily=precipitation_sum&past_days=30&forecast_days=1&timezone=auto`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error(`Weather API returned ${res.status}`);
+    const data = await res.json();
+    const results = Array.isArray(data) ? data : [data];
+
+    let worst = null;
+    results.forEach((r, i) => {
+      const place = LANDSLIDE_HOTSPOTS[i];
+      const rain30d = (r.daily && r.daily.precipitation_sum || []).reduce((a, b) => a + (b || 0), 0);
+      const soilSeries = (r.hourly && r.hourly.soil_moisture_0_to_1cm) || [];
+      let soil = null;
+      for(let j = soilSeries.length - 1; j >= 0; j--){
+        if(soilSeries[j] !== null && soilSeries[j] !== undefined){ soil = soilSeries[j]; break; }
+      }
+      const score = rain30d + (soil !== null ? soil * 300 : 0); // simple combined wetness ranking
+      if(!worst || score > worst.score) worst = { place, rain30d, soil, score };
+    });
+
+    if(worst){
+      addHotspotMarker(worst.place[1], worst.place[2], getComputedStyle(document.documentElement).getPropertyValue('--clay').trim(), '⬤',
+        'Wettest known landslide-prone region',
+        `${worst.place[0]} — ${worst.rain30d.toFixed(0)}mm rain (30d)${worst.soil !== null ? `, soil ${worst.soil.toFixed(2)} m³/m³` : ''}`,
+        `Worst among ${LANDSLIDE_HOTSPOTS.length} known landslide-prone regions, ranked by current wetness — not a full global scan.`
+      );
+    }
+  } catch(e){ /* skip if it fails */ }
+}
+
+// ---------------------------------------------------------------
+// CONFLICT_ZONES — a curated list of major ongoing armed conflicts, compiled
+// from Wikipedia's continuously-maintained "List of ongoing armed conflicts"
+// and cross-checked against current conflict trackers, as of September 2026.
+//
+// Why curated rather than live: ReliefWeb's API (used earlier for this)
+// changed its policy on 1 November 2025 to require a pre-approved appname —
+// effectively an API key now, not the free self-identifying string it used
+// to be — which isn't something obtainable for this project. A curated list
+// is the honest fallback, same as the landslide-prone regions and major
+// cities used elsewhere in this app, but it WILL go stale as real situations
+// change. For anything current, check a live tracker directly: the CFR
+// Global Conflict Tracker, ACLED, or UCDP.
+// ---------------------------------------------------------------
+const CONFLICT_ZONES = [
+  ['Russia–Ukraine war', 'Ukraine', 48.3794, 31.1656],
+  ['Gaza conflict (Israeli–Palestinian)', 'Gaza Strip, Palestine', 31.5, 34.47],
+  ['Israeli–Lebanese conflict (Hezbollah–Israel)', 'Lebanon', 33.8547, 35.8623],
+  ['Israeli–Syrian conflict', 'Syria', 34.8021, 38.9968],
+  ['Iran war (2026)', 'Iran', 32.4279, 53.6880],
+  ['Yemeni civil war / Houthi conflict', 'Yemen', 15.5527, 48.5164],
+  ['Sudan civil war', 'Sudan', 15.5007, 32.5599],
+  ['Myanmar civil war', 'Myanmar', 19.7633, 96.0785],
+  ['Somali civil war', 'Somalia', 5.1521, 46.1996],
+  ['DR Congo conflict (M23 offensive)', 'Democratic Republic of the Congo', -1.6792, 29.2228],
+  ['Sahel insurgency', 'Mali', 17.5707, -3.9962],
+  ['Mexican drug war', 'Mexico', 23.6345, -102.5528],
+  ['Pakistan–Afghanistan border conflict', 'Afghanistan', 33.9391, 67.7100],
+  ['Boko Haram / Lake Chad Basin insurgency', 'Nigeria–Cameroon border region', 11.2, 14.2],
+  ['Ethiopian internal conflict (Tigray/Amhara)', 'Ethiopia', 12.5, 39.5],
+  ['Libyan civil conflict', 'Libya', 26.3351, 17.2283],
+  ['Venezuela crisis', 'Venezuela', 8.0, -66.0],
+];
+
+async function loadHotspots(){
+  await Promise.allSettled([
+    findWorstEarthquake(),
+    findWorstGdacsEvents(),
+    findWorstHeatAndWind(),
+    findWorstLandslide()
+  ]);
+}
+
+hotspotsBtn.addEventListener('click', async () => {
+  if(hotspotsVisible){
+    map.removeLayer(hotspotsLayer);
+    hotspotsVisible = false;
+    hotspotsBtn.classList.remove('active');
+    hotspotsBtnText.textContent = 'Hotspots';
+    return;
+  }
+  hotspotsBtn.classList.add('active');
+  hotspotsBtn.disabled = true;
+  hotspotsBtnText.textContent = 'Loading…';
+  if(!hotspotsLoaded){
+    await loadHotspots();
+    hotspotsLoaded = true;
+  }
+  hotspotsLayer.addTo(map);
+  hotspotsVisible = true;
+  hotspotsBtn.disabled = false;
+  hotspotsBtnText.textContent = 'Hide hotspots';
+});
+
+// ---------------------------------------------------------------
+// STORMS — a marker for every currently active tropical cyclone globally
+// (from the GDACS feed, real active events — not just the single worst one
+// the Hotspots button shows). Clicking a storm marker "selects" it and
+// enables the Forecast Path button, which then draws that storm's official
+// predicted track.
+// ---------------------------------------------------------------
+const stormsLayer = L.layerGroup();
+const stormsBtn = document.getElementById('storms-btn');
+const stormsBtnText = document.getElementById('storms-btn-text');
+const forecastPathBtn = document.getElementById('forecast-path-btn');
+const forecastPathBtnText = document.getElementById('forecast-path-btn-text');
+let stormsLoaded = false;
+let stormsVisible = false;
+let selectedStorm = null; // { name, lat, lng }
+let forecastTrackLayer = null;
+
+function stormIcon(color){
+  return L.divIcon({
+    className: '',
+    html: `<div class="hotspot-icon-wrap" style="background:${color};font-size:13px;">🌀</div>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+    popupAnchor: [0, -11]
+  });
+}
+
+function selectStorm(name, lat, lng){
+  selectedStorm = { name, lat, lng };
+  forecastPathBtn.disabled = false;
+  forecastPathBtn.title = `Show ${name}'s predicted track`;
+  // A newly selected storm supersedes whatever track was already drawn
+  if(forecastTrackLayer){ map.removeLayer(forecastTrackLayer); forecastTrackLayer = null; forecastPathBtnText.textContent = 'Forecast path'; }
+}
+
+async function loadStorms(){
+  try{
+    const res = await fetch('https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?alertlevel=green;orange;red');
+    if(!res.ok) throw new Error(`GDACS returned ${res.status}`);
+    const data = await res.json();
+    const tcFeatures = (data.features || []).filter(f => f.properties.eventtype === 'TC');
+
+    // Dedupe by eventid, keeping each storm's most recent episode
+    const byEvent = {};
+    for(const f of tcFeatures){
+      const id = f.properties.eventid;
+      if(!byEvent[id] || new Date(f.properties.fromdate) > new Date(byEvent[id].properties.fromdate)){
+        byEvent[id] = f;
+      }
+    }
+
+    const color = getComputedStyle(document.documentElement).getPropertyValue('--storm').trim();
+    Object.values(byEvent).forEach(f => {
+      const [lon, lat] = f.geometry.coordinates;
+      const name = f.properties.eventname || 'Unnamed storm';
+      const label = regionalStormName(lat, lon);
+      const dateStr = f.properties.fromdate ? new Date(f.properties.fromdate).toISOString().slice(0, 10) : '';
+      const m = L.marker([lat, lon], { icon: stormIcon(color) }).addTo(stormsLayer);
+      const btnId = `storm-select-${f.properties.eventid}`;
+      m.bindPopup(
+        `<div class="hotspot-popup">
+          <h4>${name}</h4>
+          <p>${label} — ${f.properties.alertlevel} alert (${dateStr})</p>
+          <button id="${btnId}">Select this storm</button>
+        </div>`
+      );
+      m.on('popupopen', () => {
+        const btn = document.getElementById(btnId);
+        if(btn) btn.addEventListener('click', () => {
+          selectStorm(name, lat, lon);
+          map.closePopup();
+        });
+      });
+    });
+  } catch(e){ /* if this fails, the Storms toggle just won't have anything to show */ }
+}
+
+stormsBtn.addEventListener('click', async () => {
+  if(stormsVisible){
+    map.removeLayer(stormsLayer);
+    stormsVisible = false;
+    stormsBtn.classList.remove('active');
+    stormsBtnText.textContent = 'Storms';
+    return;
+  }
+  stormsBtn.classList.add('active');
+  stormsBtn.disabled = true;
+  stormsBtnText.textContent = 'Loading…';
+  if(!stormsLoaded){
+    await loadStorms();
+    stormsLoaded = true;
+  }
+  stormsLayer.addTo(map);
+  stormsVisible = true;
+  stormsBtn.disabled = false;
+  stormsBtnText.textContent = 'Hide storms';
+});
+
+// ---------------------------------------------------------------
+// Forecast Path — the official predicted track, from NHC/JTWC/Esri's
+// jointly published live feed (covers all ocean basins, not just the
+// Atlantic). Only usable once a storm has been selected above.
+// ---------------------------------------------------------------
+async function showForecastPath(){
+  if(!selectedStorm) return;
+  if(forecastTrackLayer){
+    // Already showing a track — treat a second click as "hide it"
+    map.removeLayer(forecastTrackLayer);
+    forecastTrackLayer = null;
+    forecastPathBtnText.textContent = 'Forecast path';
+    return;
+  }
+  forecastPathBtn.disabled = true;
+  forecastPathBtnText.textContent = 'Loading…';
+  try{
+    const url = 'https://services9.arcgis.com/RHVPKKiFTONKtxq3/arcgis/rest/services/Active_Hurricanes_v1/FeatureServer/2/query' +
+      '?where=1%3D1&outFields=*&f=geojson';
+    const res = await fetch(url);
+    if(!res.ok) throw new Error(`Forecast service returned ${res.status}`);
+    const data = await res.json();
+    const features = data.features || [];
+
+    // Field names in this service can vary slightly, so this looks for anything
+    // that resembles a storm-name field rather than assuming one exact key.
+    const nameKeyOf = (props) => Object.keys(props).find(k => /stormname|name/i.test(k));
+    const targetName = selectedStorm.name.toLowerCase();
+    const matches = features.filter(f => {
+      const nk = nameKeyOf(f.properties);
+      if(!nk) return false;
+      const val = String(f.properties[nk] || '').toLowerCase();
+      return val.includes(targetName) || targetName.includes(val);
+    });
+
+    if(!matches.length){
+      forecastPathBtnText.textContent = 'Forecast path';
+      forecastPathBtn.disabled = false;
+      setAddressStatus('error', `No official forecast track found for ${selectedStorm.name} right now — it may not currently be tracked by NHC/JTWC, or may have dissipated. Check that storm's national meteorological agency directly.`);
+      return;
+    }
+
+    const color = getComputedStyle(document.documentElement).getPropertyValue('--storm').trim();
+    forecastTrackLayer = L.geoJSON({ type: 'FeatureCollection', features: matches }, {
+      style: { color, weight: 3, dashArray: '6 5', opacity: 0.9 }
+    }).addTo(map);
+    forecastPathBtnText.textContent = 'Hide path';
+  } catch(e){
+    forecastPathBtnText.textContent = 'Forecast path';
+    setAddressStatus('error', `Couldn't load the forecast track right now: ${e.message}`);
+  } finally {
+    forecastPathBtn.disabled = false;
+  }
+}
+
+forecastPathBtn.addEventListener('click', showForecastPath);
+
+// ---------------------------------------------------------------
+// VOLCANOES — a curated list of well-known active volcanoes worldwide
+// (static geographic data; volcano locations don't move), cross-referenced
+// against GDACS's live volcanic-eruption feed to mark which are actually
+// erupting right now.
+//
+// Deliberately NOT included: a "predicted to erupt" category. Real eruption
+// forecasting is done by volcano observatories using seismometers, ground-
+// deformation sensors and gas monitoring — there's no free API for that, and
+// faking one would be actively irresponsible. "Currently erupting" (real,
+// live GDACS data) is the honest version of what's offered instead.
+// ---------------------------------------------------------------
+const VOLCANOES = [
+  ['Kilauea', 'USA (Hawaii)', 19.4069, -155.2834],
+  ['Mauna Loa', 'USA (Hawaii)', 19.4750, -155.6070],
+  ['Shishaldin', 'USA (Alaska)', 54.7554, -163.9711],
+  ['Pavlof', 'USA (Alaska)', 55.4173, -161.8937],
+  ['Etna', 'Italy', 37.7510, 14.9934],
+  ['Stromboli', 'Italy', 38.7889, 15.2130],
+  ['Vesuvius', 'Italy', 40.8214, 14.4260],
+  ['Merapi', 'Indonesia', -7.5407, 110.4457],
+  ['Krakatoa', 'Indonesia', -6.1020, 105.4230],
+  ['Semeru', 'Indonesia', -8.1077, 112.9224],
+  ['Sinabung', 'Indonesia', 3.1700, 98.3920],
+  ['Fuji', 'Japan', 35.3606, 138.7274],
+  ['Sakurajima', 'Japan', 31.5850, 130.6570],
+  ['Aso', 'Japan', 32.8845, 131.1046],
+  ['Popocatépetl', 'Mexico', 19.0233, -98.6280],
+  ['Colima', 'Mexico', 19.5140, -103.6200],
+  ['Villarrica', 'Chile', -39.4200, -71.9300],
+  ['Cotopaxi', 'Ecuador', -0.6772, -78.4368],
+  ['Sangay', 'Ecuador', -2.0050, -78.3410],
+  ['Reventador', 'Ecuador', -0.0770, -77.6560],
+  ['Nevado del Ruiz', 'Colombia', 4.8950, -75.3220],
+  ['Pacaya', 'Guatemala', 14.3810, -90.6010],
+  ['Fuego', 'Guatemala', 14.4730, -90.8800],
+  ['Masaya', 'Nicaragua', 11.9840, -86.1610],
+  ['Kilimanjaro', 'Tanzania', -3.0674, 37.3556],
+  ['Ol Doinyo Lengai', 'Tanzania', -2.7640, 35.9140],
+  ['Nyiragongo', 'DR Congo', -1.5197, 29.2500],
+  ['Erta Ale', 'Ethiopia', 13.6000, 40.6700],
+  ['Taal', 'Philippines', 14.0021, 120.9930],
+  ['Mayon', 'Philippines', 13.2572, 123.6856],
+  ['Pinatubo', 'Philippines', 15.1300, 120.3500],
+  ['White Island', 'New Zealand', -37.5200, 177.1830],
+  ['Ruapehu', 'New Zealand', -39.2800, 175.5700],
+  ['Yasur', 'Vanuatu', -19.5320, 169.4420],
+  ['Ambrym', 'Vanuatu', -16.2500, 168.1200],
+  ['Katla', 'Iceland', 63.6300, -19.0500],
+  ['Hekla', 'Iceland', 63.9920, -19.7000],
+  ['Eyjafjallajökull', 'Iceland', 63.6300, -19.6000],
+  ['Bárðarbunga', 'Iceland', 64.6390, -17.5300],
+  ['Grímsvötn', 'Iceland', 64.4160, -17.3160],
+  ['Piton de la Fournaise', 'Réunion', -21.2440, 55.7080],
+];
+
+const volcanoesLayer = L.layerGroup();
+const volcanoesBtn = document.getElementById('volcanoes-btn');
+const volcanoesBtnText = document.getElementById('volcanoes-btn-text');
+const eruptingOnlyBtn = document.getElementById('erupting-only-btn');
+let volcanoesLoaded = false;
+let volcanoesVisible = false;
+let eruptingOnlyActive = false;
+let volcanoImpactLayer = null;
+
+function volcanoIcon(erupting){
+  const color = erupting
+    ? getComputedStyle(document.documentElement).getPropertyValue('--severe').trim()
+    : getComputedStyle(document.documentElement).getPropertyValue('--muted').trim();
+  if(!erupting){
+    // Lightweight dot for the (now much larger, ~1400-volcano) dormant set —
+    // keeps the map calm and the DOM light compared to a full emoji badge each.
+    return L.divIcon({
+      className: '',
+      html: `<div style="width:9px;height:9px;border-radius:50%;background:${color};border:1.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.35);"></div>`,
+      iconSize: [9, 9],
+      iconAnchor: [4, 4],
+      popupAnchor: [0, -4]
+    });
+  }
+  return L.divIcon({
+    className: '',
+    html: `<div class="hotspot-icon-wrap" style="background:${color};font-size:13px;box-shadow:0 0 0 3px color-mix(in srgb, ${color} 35%, transparent), 0 2px 8px rgba(0,0,0,0.4);">🌋</div>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+    popupAnchor: [0, -11]
+  });
+}
+
+function clearVolcanoImpact(){
+  if(volcanoImpactLayer){ map.removeLayer(volcanoImpactLayer); volcanoImpactLayer = null; }
+}
+
+async function showVolcanoImpact(name, lat, lng, btnId){
+  clearVolcanoImpact();
+  const btn = document.getElementById(btnId);
+  if(btn){ btn.disabled = true; btn.textContent = 'Loading wind data…'; }
+  try{
+    const color = getComputedStyle(document.documentElement).getPropertyValue('--severe').trim();
+    const group = L.layerGroup();
+
+    // Indicative advisory radius — a generic, commonly-cited near-field caution
+    // distance, NOT an official hazard map specific to this volcano's real
+    // eruption history or explosivity. Said explicitly in the popup, too.
+    const radiusMeters = 20000;
+    L.circle([lat, lng], {
+      radius: radiusMeters, color, weight: 2, fillColor: color, fillOpacity: 0.12, dashArray: '5 4'
+    }).addTo(group);
+
+    // Live wind direction at the volcano — a genuinely real signal for which
+    // way ashfall is likely drifting right now.
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=wind_direction_10m,wind_speed_10m`);
+    let windNote = 'Live wind data unavailable right now.';
+    if(res.ok){
+      const data = await res.json();
+      const dir = data.current.wind_direction_10m; // degrees, direction wind is coming FROM
+      const speed = data.current.wind_speed_10m;
+      if(dir != null){
+        // Ash drifts the direction the wind is blowing TOWARDS, i.e. dir + 180
+        const towardRad = ((dir + 180) % 360) * Math.PI / 180;
+        const arrowKm = 60;
+        const endLat = lat + (arrowKm / 111) * Math.cos(towardRad);
+        const endLng = lng + (arrowKm / (111 * Math.cos(lat * Math.PI / 180))) * Math.sin(towardRad);
+        L.polyline([[lat, lng], [endLat, endLng]], { color, weight: 3 }).addTo(group);
+        L.circleMarker([endLat, endLng], { radius: 5, color, fillColor: color, fillOpacity: 1 }).addTo(group);
+        const compassPoints = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+        const compass = compassPoints[Math.round(((dir + 180) % 360) / 22.5) % 16];
+        windNote = `Wind currently blowing toward the ${compass} at ${speed.toFixed(0)}km/h — ash is likely drifting that direction.`;
+      }
+    }
+
+    group.addTo(map);
+    volcanoImpactLayer = group;
+    if(btn){
+      btn.disabled = false;
+      btn.textContent = 'Hide affected area';
+    }
+    map.closePopup();
+    L.popup({ closeButton: true })
+      .setLatLng([lat, lng])
+      .setContent(`<div class="hotspot-popup"><h4>${name} — affected area</h4>
+        <p>Dashed circle: a generic ~20km near-field advisory radius, not an official hazard zone for this specific volcano.</p>
+        <p>${windNote}</p></div>`)
+      .openOn(map);
+  } catch(e){
+    if(btn){ btn.disabled = false; btn.textContent = 'Show affected area'; }
+  }
+}
+
+// Fetches the complete official Smithsonian Global Volcanism Program catalog
+// (~1,400 Holocene volcanoes) from their own public web service. Falls back to
+// the small curated list above only if that service can't be reached — so the
+// feature still works, just with less coverage, rather than failing outright.
+// Returns structured objects (not just tuples) so height and last-eruption-year
+// can be shown as their own fields rather than a pre-baked string.
+async function fetchAllKnownVolcanoes(){
+  const url = 'https://webservices.volcano.si.edu/geoserver/GVP-VOTW/ows' +
+    '?service=WFS&version=1.0.0&request=GetFeature' +
+    '&typeName=GVP-VOTW:Smithsonian_VOTW_Holocene_Volcanoes&outputFormat=json';
+  const res = await fetch(url);
+  if(!res.ok) throw new Error(`Smithsonian GVP service returned ${res.status}`);
+  const data = await res.json();
+  const features = data.features || [];
+  if(!features.length) throw new Error('Smithsonian GVP service returned no volcanoes');
+  return features.map(f => {
+    const p = f.properties;
+    const [lng, lat] = f.geometry.coordinates;
+    return {
+      name: p.Volcano_Name || p.volcano_name || 'Unnamed volcano',
+      country: p.Country || p.country || '',
+      elevation: (p.Elevation != null ? p.Elevation : p.elevation) ?? null,
+      lastErupted: p.Last_Eruption_Year || p.last_eruption_year || null,
+      lat, lng
+    };
+  });
+}
+
+// Shared cache — both the toolbar's "show all volcanoes" layer and the
+// per-point Volcano card use this, so clicking around the map doesn't
+// re-fetch the whole ~1,400-entry catalog on every single check.
+let volcanoListCache = null;
+let volcanoListSource = null; // 'live' | 'fallback'
+
+async function getVolcanoList(){
+  if(volcanoListCache) return { list: volcanoListCache, source: volcanoListSource };
+  try{
+    volcanoListCache = await fetchAllKnownVolcanoes();
+    volcanoListSource = 'live';
+  } catch(e){
+    volcanoListCache = VOLCANOES.map(([name, place, lat, lng]) => ({
+      name, country: place, elevation: null, lastErupted: null, lat, lng
+    }));
+    volcanoListSource = 'fallback';
+  }
+  return { list: volcanoListCache, source: volcanoListSource };
+}
+
+async function loadVolcanoes(){
+  const { list: volcanoList, source } = await getVolcanoList();
+  const usedLiveSource = source === 'live';
+
+  // Cross-reference against GDACS's live volcanic-eruption feed (VO)
+  let eruptingEvents = [];
+  try{
+    const res = await fetch('https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?alertlevel=green;orange;red');
+    if(res.ok){
+      const data = await res.json();
+      eruptingEvents = (data.features || []).filter(f => f.properties.eventtype === 'VO');
+    }
+  } catch(e){ /* proceed without eruption cross-referencing if GDACS is unreachable */ }
+
+  const matchedEventIds = new Set();
+
+  volcanoList.forEach(({ name, country, lastErupted, lat, lng }) => {
+    const place = country + (lastErupted ? ` — last erupted ${lastErupted}` : '');
+    const nearbyEvent = eruptingEvents.find(f => {
+      const [lon2, lat2] = f.geometry.coordinates;
+      return distanceKm(lat, lng, lat2, lon2) <= 50;
+    });
+    const erupting = !!nearbyEvent;
+    if(nearbyEvent) matchedEventIds.add(nearbyEvent.properties.eventid);
+
+    const m = L.marker([lat, lng], { icon: volcanoIcon(erupting) });
+    m.hazardIsErupting = erupting;
+    const btnId = `volcano-impact-${name.replace(/\W/g, '')}-${Math.round(lat*100)}`;
+    m.bindPopup(
+      `<div class="hotspot-popup">
+        <h4>${name}</h4>
+        <p>${place} — ${erupting ? '<strong>Erupting now</strong> (GDACS live feed)' : 'Not currently erupting'}</p>
+        ${erupting ? `<button id="${btnId}">Show affected area</button>` : `<p style="font-size:11px;">No active hazard zone to show.</p>`}
+      </div>`
+    );
+    if(erupting){
+      m.on('popupopen', () => {
+        const btn = document.getElementById(btnId);
+        if(btn) btn.addEventListener('click', () => showVolcanoImpact(name, lat, lng, btnId));
+      });
+    }
+    m.addTo(volcanoesLayer);
+  });
+
+  // Any GDACS eruption NOT near a known volcano — still shown, so a real
+  // active eruption is never silently missed just because it wasn't matched
+  eruptingEvents.filter(f => !matchedEventIds.has(f.properties.eventid)).forEach(f => {
+    const [lng, lat] = f.geometry.coordinates;
+    const name = f.properties.eventname || 'Unnamed volcanic event';
+    const m = L.marker([lat, lng], { icon: volcanoIcon(true) });
+    m.hazardIsErupting = true;
+    const btnId = `volcano-impact-gdacs-${f.properties.eventid}`;
+    m.bindPopup(
+      `<div class="hotspot-popup">
+        <h4>${name}</h4>
+        <p>${f.properties.country || ''} — <strong>Erupting now</strong> (GDACS live feed, not matched to the known-volcano list)</p>
+        <button id="${btnId}">Show affected area</button>
+      </div>`
+    );
+    m.on('popupopen', () => {
+      const btn = document.getElementById(btnId);
+      if(btn) btn.addEventListener('click', () => showVolcanoImpact(name, lat, lng, btnId));
+    });
+    m.addTo(volcanoesLayer);
+  });
+
+  return { count: volcanoList.length, usedLiveSource };
+}
+
+function applyEruptingFilter(){
+  volcanoesLayer.eachLayer(m => {
+    const show = !eruptingOnlyActive || m.hazardIsErupting;
+    const el = m.getElement && m.getElement();
+    if(el) el.style.display = show ? '' : 'none';
+  });
+}
+
+volcanoesBtn.addEventListener('click', async () => {
+  if(volcanoesVisible){
+    map.removeLayer(volcanoesLayer);
+    clearVolcanoImpact();
+    volcanoesVisible = false;
+    volcanoesBtn.classList.remove('active');
+    volcanoesBtnText.textContent = 'Volcanoes';
+    eruptingOnlyBtn.disabled = true;
+    return;
+  }
+  volcanoesBtn.classList.add('active');
+  volcanoesBtn.disabled = true;
+  volcanoesBtnText.textContent = 'Loading…';
+  if(!volcanoesLoaded){
+    const result = await loadVolcanoes();
+    volcanoesLoaded = true;
+    volcanoesBtn.title = result.usedLiveSource
+      ? `${result.count} volcanoes from the Smithsonian Global Volcanism Program`
+      : `${result.count} well-known volcanoes (Smithsonian's live service was unreachable, showing a smaller curated fallback list)`;
+  }
+  volcanoesLayer.addTo(map);
+  applyEruptingFilter();
+  volcanoesVisible = true;
+  volcanoesBtn.disabled = false;
+  volcanoesBtnText.textContent = 'Hide volcanoes';
+  eruptingOnlyBtn.disabled = false;
+});
+
+eruptingOnlyBtn.addEventListener('click', () => {
+  eruptingOnlyActive = !eruptingOnlyActive;
+  eruptingOnlyBtn.classList.toggle('active', eruptingOnlyActive);
+  applyEruptingFilter();
+});
+
+// ---------------------------------------------------------------
+// CONFLICTS — a marker for every entry in the curated CONFLICT_ZONES list
+// (defined further up the script, above the Hotspots block) — not a live
+// feed; see that block's comment for why. Each popup links to real
+// trackers and carries the same staleness caveat.
+//
+// Lives in its own "Humanitarian" section of the toolbar, split off from
+// the natural-hazard tools with a divider, rather than a sidebar card.
+// ---------------------------------------------------------------
+const conflictsLayer = L.layerGroup();
+const conflictsBtn = document.getElementById('conflicts-btn');
+const conflictsBtnText = document.getElementById('conflicts-btn-text');
+let conflictsLoaded = false;
+let conflictsVisible = false;
+
+function conflictIcon(){
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--conflict').trim();
+  return L.divIcon({
+    className: '',
+    html: `<div class="hotspot-icon-wrap" style="background:${color};font-size:12px;">⚔️</div>`,
+    iconSize: [22, 22], iconAnchor: [11, 11], popupAnchor: [0, -11]
+  });
+}
+
+async function loadConflicts(){
+  CONFLICT_ZONES.forEach(([name, region, lat, lng]) => {
+    const btnId = `conflict-marker-${name.replace(/[^\w-]/g, '')}`;
+    const m = L.marker([lat, lng], { icon: conflictIcon() }).addTo(conflictsLayer);
+    m.bindPopup(
+      `<div class="hotspot-popup">
+        <h4>${name}</h4>
+        <p>${region}</p>
+        <p style="font-size:11px;">From a curated list compiled September 2026, not a live feed — a real situation may have changed since. Check a live tracker (CFR Global Conflict Tracker, ACLED, UCDP) for anything current.</p>
+        <button id="${btnId}">Check this point</button>
+      </div>`
+    );
+    m.on('popupopen', () => {
+      const btn = document.getElementById(btnId);
+      if(btn) btn.addEventListener('click', () => { map.closePopup(); goToLocation(lat, lng, 6); });
+    });
+  });
+  return { total: CONFLICT_ZONES.length, placed: CONFLICT_ZONES.length };
+}
+
+conflictsBtn.addEventListener('click', async () => {
+  if(conflictsVisible){
+    map.removeLayer(conflictsLayer);
+    conflictsVisible = false;
+    conflictsBtn.classList.remove('active');
+    conflictsBtnText.textContent = 'Conflicts';
+    return;
+  }
+  conflictsBtn.classList.add('active');
+  conflictsBtn.disabled = true;
+  conflictsBtnText.textContent = 'Loading…';
+  if(!conflictsLoaded){
+    await loadConflicts();
+    conflictsLoaded = true;
+  }
+  conflictsLayer.addTo(map);
+  conflictsVisible = true;
+  conflictsBtn.disabled = false;
+  conflictsBtnText.textContent = 'Hide conflicts';
+});
+
+// ---------------------------------------------------------------
+// Address search — Photon (Komoot), free and keyless, built specifically
+// for search-as-you-type. (Nominatim's own usage policy explicitly asks
+// apps NOT to do live autocomplete against it, so Photon is the right
+// tool here rather than reusing the same API as the one-shot Search button.)
+// ---------------------------------------------------------------
+const addressInput = document.getElementById('address-input');
+const addressBtn = document.getElementById('address-search-btn');
+const addressStatus = document.getElementById('address-status');
+const suggestionsBox = document.getElementById('address-suggestions');
+
+let currentSuggestions = [];
+let activeSuggestionIndex = -1;
+let debounceTimer = null;
+
+function setAddressStatus(mode, text){
+  addressStatus.className = 'address-status' + (mode ? ' ' + mode : '');
+  addressStatus.innerHTML = mode === 'loading'
+    ? `<span class="spinner"></span>${text}`
+    : text;
+}
+
+function formatSuggestionLabel(props){
+  const main = props.name || props.street || 'Unnamed place';
+  const subParts = [props.city, props.state, props.country].filter(Boolean);
+  return { main, sub: subParts.join(', ') };
+}
+
+function closeSuggestions(){
+  suggestionsBox.classList.remove('open');
+  suggestionsBox.innerHTML = '';
+  currentSuggestions = [];
+  activeSuggestionIndex = -1;
+}
+
+function renderSuggestions(features){
+  currentSuggestions = features;
+  activeSuggestionIndex = -1;
+  if(!features.length){
+    closeSuggestions();
+    return;
+  }
+  suggestionsBox.innerHTML = features.map((f, i) => {
+    const { main, sub } = formatSuggestionLabel(f.properties);
+    return `<button type="button" data-index="${i}">${main}${sub ? `<span class="suggestion-sub">${sub}</span>` : ''}</button>`;
+  }).join('');
+  suggestionsBox.classList.add('open');
+  suggestionsBox.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => selectSuggestion(parseInt(btn.dataset.index, 10)));
+  });
+}
+
+function selectSuggestion(index){
+  const f = currentSuggestions[index];
+  if(!f) return;
+  const { main, sub } = formatSuggestionLabel(f.properties);
+  addressInput.value = sub ? `${main}, ${sub}` : main;
+  closeSuggestions();
+  const [lon, lat] = f.geometry.coordinates;
+  goToLocation(lat, lon, 12);
+}
+
+async function fetchSuggestions(query){
+  try{
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error(`Search failed (${res.status})`);
+    const data = await res.json();
+    renderSuggestions(data.features || []);
+  } catch(err){
+    closeSuggestions();
+  }
+}
+
+addressInput.addEventListener('input', () => {
+  const q = addressInput.value.trim();
+  clearTimeout(debounceTimer);
+  if(q.length < 3){
+    closeSuggestions();
+    return;
+  }
+  debounceTimer = setTimeout(() => fetchSuggestions(q), 300);
+});
+
+addressInput.addEventListener('keydown', (e) => {
+  const items = suggestionsBox.querySelectorAll('button');
+  if(e.key === 'ArrowDown' && items.length){
+    e.preventDefault();
+    activeSuggestionIndex = Math.min(activeSuggestionIndex + 1, items.length - 1);
+    items.forEach((el, i) => el.classList.toggle('active', i === activeSuggestionIndex));
+    items[activeSuggestionIndex].scrollIntoView({ block: 'nearest' });
+  } else if(e.key === 'ArrowUp' && items.length){
+    e.preventDefault();
+    activeSuggestionIndex = Math.max(activeSuggestionIndex - 1, 0);
+    items.forEach((el, i) => el.classList.toggle('active', i === activeSuggestionIndex));
+    items[activeSuggestionIndex].scrollIntoView({ block: 'nearest' });
+  } else if(e.key === 'Enter'){
+    e.preventDefault();
+    if(activeSuggestionIndex >= 0 && currentSuggestions[activeSuggestionIndex]){
+      selectSuggestion(activeSuggestionIndex);
+    } else {
+      const q = addressInput.value.trim();
+      if(q) searchAddressDirect(q);
+    }
+  } else if(e.key === 'Escape'){
+    closeSuggestions();
+  }
+});
+
+document.addEventListener('click', (e) => {
+  if(!e.target.closest('.map-search-box')) closeSuggestions();
+});
+
+// Fallback for the Search button / plain Enter with no suggestion highlighted —
+// takes the best single match rather than requiring a dropdown pick.
+async function searchAddressDirect(query){
+  addressBtn.disabled = true;
+  setAddressStatus('loading', 'Searching…');
+  try{
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error(`Search failed (${res.status})`);
+    const data = await res.json();
+    const features = data.features || [];
+    if(!features.length){
+      setAddressStatus('error', `No results found for "${query}".`);
+      return;
+    }
+    setAddressStatus('', '');
+    closeSuggestions();
+    const [lon, lat] = features[0].geometry.coordinates;
+    goToLocation(lat, lon, 12);
+  } catch(err){
+    setAddressStatus('error', `Couldn't search right now: ${err.message}`);
+  } finally {
+    addressBtn.disabled = false;
+  }
+}
+
+addressBtn.addEventListener('click', () => {
+  const q = addressInput.value.trim();
+  if(q) searchAddressDirect(q);
+});
+
+// ---------------------------------------------------------------
+// Panel rendering helpers
+// ---------------------------------------------------------------
+const panel = document.getElementById('results');
+
+function bandClass(band){
+  return { 'Low':'low','Moderate':'moderate','High':'high','Severe':'severe','Unknown':'unknown' }[band] || 'unknown';
+}
+
+function renderShell(lat, lng, areaInfo){
+  const coordsLabel = areaInfo
+    ? `Selected area: ${areaInfo.vertexCount}-point shape, ~${areaInfo.areaKm2.toFixed(1)}km² ` +
+      `(radius ~${areaInfo.radiusKm.toFixed(1)}km from centre) ` +
+      `— centred ${lat.toFixed(4)}, ${lng.toFixed(4)}`
+    : `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  const terrainLoadingText = areaInfo
+    ? 'Sampling elevation at every point of your shape…'
+    : 'Sampling elevation around this point…';
+  panel.innerHTML = `
+    <div class="coords">${coordsLabel}</div>
+    <div class="card collapsed" id="card-flood">
+      <div class="card-head">
+        <div class="card-title"><span class="dot" style="background:var(--river)"></span>Flood</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="band unknown" id="band-flood">…</span>
+          <svg class="card-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+      </div>
+      <div class="card-body" id="body-flood"><div class="loading"><span class="spinner"></span>Checking Environment Agency flood data…</div></div>
+    </div>
+    <div class="card collapsed" id="card-fire">
+      <div class="card-head">
+        <div class="card-title"><span class="dot" style="background:var(--amber)"></span>Wildfire weather</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="band unknown" id="band-fire">…</span>
+          <svg class="card-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+      </div>
+      <div class="card-body" id="body-fire"><div class="loading"><span class="spinner"></span>Pulling current weather conditions…</div></div>
+    </div>
+    <div class="card collapsed" id="card-slide">
+      <div class="card-head">
+        <div class="card-title"><span class="dot" style="background:var(--clay)"></span>Terrain / landslide</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="band unknown" id="band-slide">…</span>
+          <svg class="card-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+      </div>
+      <div class="card-body" id="body-slide"><div class="loading"><span class="spinner"></span>${terrainLoadingText}</div></div>
+    </div>
+    <div class="card collapsed" id="card-quake">
+      <div class="card-head">
+        <div class="card-title"><span class="dot" style="background:var(--quake)"></span>Earthquake</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="band unknown" id="band-quake">…</span>
+          <svg class="card-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+      </div>
+      <div class="card-body" id="body-quake"><div class="loading"><span class="spinner"></span>Checking USGS seismic records…</div></div>
+    </div>
+    <div class="card collapsed" id="card-heat">
+      <div class="card-head">
+        <div class="card-title"><span class="dot" style="background:var(--heat)"></span>Extreme heat</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="band unknown" id="band-heat">…</span>
+          <svg class="card-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+      </div>
+      <div class="card-body" id="body-heat"><div class="loading"><span class="spinner"></span>Checking 7-day temperature forecast…</div></div>
+    </div>
+    <div class="card collapsed" id="card-wind">
+      <div class="card-head">
+        <div class="card-title"><span class="dot" style="background:var(--wind)"></span>High wind / storm</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="band unknown" id="band-wind">…</span>
+          <svg class="card-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+      </div>
+      <div class="card-body" id="body-wind"><div class="loading"><span class="spinner"></span>Checking 7-day wind forecast…</div></div>
+    </div>
+    <div class="card collapsed" id="card-storm">
+      <div class="card-head">
+        <div class="card-title"><span class="dot" style="background:var(--storm)"></span><span id="storm-label">${regionalStormName(lat,lng)}</span></div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="band unknown" id="band-storm">…</span>
+          <svg class="card-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+      </div>
+      <div class="card-body" id="body-storm"><div class="loading"><span class="spinner"></span>Checking global storm records…</div></div>
+    </div>
+    <div class="card collapsed" id="card-volcano">
+      <div class="card-head">
+        <div class="card-title"><span class="dot" style="background:var(--volcano)"></span>Volcano</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="band unknown" id="band-volcano">…</span>
+          <svg class="card-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+      </div>
+      <div class="card-body" id="body-volcano"><div class="loading"><span class="spinner"></span>Checking the nearest known volcano…</div></div>
+    </div>
+    <div class="no-match" id="no-match">No hazard cards match "<span id="no-match-term"></span>".</div>
+    ${areaInfo ? `<p style="font-size:11.5px;color:var(--muted);margin:2px 0 14px;">Terrain samples every point of the shape you drew, plus its centre. The other cards (flood, weather, earthquake, storm) are based on this area's centre point, since a regional forecast or radius search is already area-representative on its own.</p>` : ''}
+    <footer class="disclaimer">
+      <strong>Educational tool, not an official assessment.</strong> These are simplified indicators built from live public data,
+      not the modelling used by the Environment Agency, Met Office, USGS or British Geological Survey. For anything that matters
+      — buying property, insurance, safety planning — check
+      <a href="https://check-for-flooding.service.gov.uk" target="_blank" rel="noopener">check-for-flooding.service.gov.uk</a>
+      and your local authority directly.
+    </footer>
+  `;
+  applyHazardFilter(); // keep current search term applied to the newly rendered cards
+}
+
+function setCard(id, band, html){
+  document.getElementById(`band-${id}`).textContent = band;
+  document.getElementById(`band-${id}`).className = `band ${bandClass(band)}`;
+  document.getElementById(`body-${id}`).innerHTML = html;
+}
+
+function setError(id, msg){
+  document.getElementById(`band-${id}`).textContent = 'N/A';
+  document.getElementById(`band-${id}`).className = 'band unknown';
+  document.getElementById(`body-${id}`).innerHTML = `<div class="error">Couldn't load this: ${msg}</div>`;
+}
+
+// ---------------------------------------------------------------
+// Regional storm name — hurricane, typhoon and cyclone are the same phenomenon
+// (a tropical cyclone), just named differently by ocean basin.
+// This is a simplified approximation by longitude band, not an official basin boundary.
+// ---------------------------------------------------------------
+function regionalStormName(lat, lng){
+  if(lat < 0) return 'Cyclone'; // Southern Hemisphere: South Pacific, South Indian Ocean, Australia
+  if(lng >= 30 && lng < 100) return 'Cyclone'; // North Indian Ocean (Arabian Sea / Bay of Bengal)
+  if(lng >= 100 && lng <= 180) return 'Typhoon'; // Northwest Pacific
+  return 'Hurricane'; // North Atlantic & Northeast Pacific
+}
+
+// ---------------------------------------------------------------
+// Distance helper — haversine formula, returns km
+// ---------------------------------------------------------------
+function distanceKm(lat1, lon1, lat2, lon2){
+  const R = 6371;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// ---------------------------------------------------------------
+// Polygon helpers for the free-form drawn area (a simple mean centroid,
+// shoelace-formula area using an equirectangular projection around the
+// shape's mean latitude — fine at the scale a hand-drawn area is likely
+// to be — and the furthest vertex from the centre as a "radius").
+// ---------------------------------------------------------------
+function polygonCentroid(points){
+  const lat = points.reduce((s, p) => s + p.lat, 0) / points.length;
+  const lng = points.reduce((s, p) => s + p.lng, 0) / points.length;
+  return L.latLng(lat, lng);
+}
+
+function polygonAreaKm2(points){
+  const meanLat = points.reduce((s, p) => s + p.lat, 0) / points.length;
+  const kmPerDegLat = 111.32;
+  const kmPerDegLng = 111.32 * Math.cos(meanLat * Math.PI / 180);
+  const xy = points.map(p => [p.lng * kmPerDegLng, p.lat * kmPerDegLat]);
+  let area = 0;
+  for(let i = 0; i < xy.length; i++){
+    const [x1, y1] = xy[i];
+    const [x2, y2] = xy[(i + 1) % xy.length];
+    area += x1 * y2 - x2 * y1;
+  }
+  return Math.abs(area) / 2;
+}
+
+function polygonMaxRadiusKm(points, center){
+  return Math.max(...points.map(p => distanceKm(center.lat, center.lng, p.lat, p.lng)));
+}
+
+// ---------------------------------------------------------------
+// Collapse/expand — every card starts compact (title + status badge only);
+// clicking the header drops down the detail. Uses delegation on the results
+// container since the cards themselves are rebuilt fresh on every check.
+// ---------------------------------------------------------------
+panel.addEventListener('click', (e) => {
+  const head = e.target.closest('.card-head');
+  if(!head) return;
+  head.closest('.card').classList.toggle('collapsed');
+});
+
+// ---------------------------------------------------------------
+// Search / filter — filters the currently rendered hazard cards by name.
+// Persists across map clicks (re-applied at the end of renderShell).
+// ---------------------------------------------------------------
+const searchInput = document.getElementById('hazard-search');
+
+function applyHazardFilter(){
+  const term = searchInput.value.trim().toLowerCase();
+  const cards = panel.querySelectorAll('.card');
+  let anyVisible = false;
+  cards.forEach(card => {
+    const title = card.querySelector('.card-title').textContent.toLowerCase();
+    const match = term === '' || title.includes(term);
+    card.style.display = match ? '' : 'none';
+    if(match) anyVisible = true;
+  });
+  const noMatch = document.getElementById('no-match');
+  if(noMatch){
+    // only show "no match" once cards actually exist (i.e. a location has been checked)
+    const hasCards = cards.length > 0;
+    noMatch.style.display = (hasCards && !anyVisible) ? 'block' : 'none';
+    const termSpan = document.getElementById('no-match-term');
+    if(termSpan) termSpan.textContent = searchInput.value;
+  }
+}
+
+searchInput.addEventListener('input', applyHazardFilter);
+
+// ---------------------------------------------------------------
+// Orchestration
+// ---------------------------------------------------------------
+async function runCheck(lat, lng){
+  renderShell(lat, lng);
+  checkFlood(lat, lng);
+  checkFireWeather(lat, lng);
+  checkTerrain(lat, lng);
+  checkEarthquake(lat, lng);
+  checkHeat(lat, lng);
+  checkWind(lat, lng);
+  checkCyclone(lat, lng);
+  checkVolcano(lat, lng);
+}
+
+async function runAreaCheck(points){
+  const center = polygonCentroid(points);
+  const areaKm2 = polygonAreaKm2(points);
+  const radiusKm = polygonMaxRadiusKm(points, center);
+  renderShell(center.lat, center.lng, { areaKm2, radiusKm, vertexCount: points.length });
+  checkFlood(center.lat, center.lng);
+  checkFireWeather(center.lat, center.lng);
+  checkTerrainArea(points);
+  checkEarthquake(center.lat, center.lng);
+  checkHeat(center.lat, center.lng);
+  checkWind(center.lat, center.lng);
+  checkCyclone(center.lat, center.lng);
+  checkVolcano(center.lat, center.lng);
+}
+
+// ---------------------------------------------------------------
+// 1. FLOOD — Environment Agency real-time flood-monitoring API (England only, free, no key)
+// ---------------------------------------------------------------
+// ---------------------------------------------------------------
+// Global river discharge — Open-Meteo's Flood API, built on GloFAS (the
+// Global Flood Awareness System), the same hydrological modelling family
+// European flood agencies use, run by the EU's Copernicus Emergency
+// Management Service. Free, no key, genuinely worldwide (unlike the UK
+// Environment Agency data, which only covers England).
+// Important limit, stated in the UI: GloFAS resolves rivers on a ~5km grid,
+// so a point not right on a modelled river channel reads as minimal
+// discharge by default — that's a model-coverage gap, not necessarily "no
+// flood risk here."
+// ---------------------------------------------------------------
+async function fetchGlobalRiverDischarge(lat, lng){
+  const forecastDays = 7;
+  const url = `https://flood-api.open-meteo.com/v1/flood?latitude=${lat}&longitude=${lng}` +
+    `&daily=river_discharge&past_days=30&forecast_days=${forecastDays}`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error(`GloFAS flood API returned ${res.status}`);
+  const data = await res.json();
+  const values = (data.daily && data.daily.river_discharge) || [];
+  if(!values.length) throw new Error('No river discharge data returned');
+  const splitAt = Math.max(values.length - forecastDays, 0);
+  const past = values.slice(0, splitAt).filter(v => v != null);
+  const forecast = values.slice(splitAt).filter(v => v != null);
+  if(!past.length) throw new Error('No historical discharge data returned');
+  const baseline = past.reduce((a, b) => a + b, 0) / past.length;
+  const forecastPeak = forecast.length ? Math.max(...forecast) : baseline;
+  const currentVal = past[past.length - 1];
+  return { baseline, forecastPeak, currentVal };
+}
+
+// Converts the discharge ratio into an indicative 0-100 score, piecewise-scaled
+// so the same thresholds used for the Low/Moderate/High/Severe bands (1.3x,
+// 2x, 3x normal) land at consistent, sensible percentage points.
+function dischargeRatioToPercent(ratio){
+  let pct;
+  if(ratio < 1) pct = ratio * 15;
+  else if(ratio < 1.3) pct = 15 + (ratio - 1) / 0.3 * 15;
+  else if(ratio < 2) pct = 30 + (ratio - 1.3) / 0.7 * 30;
+  else if(ratio < 3) pct = 60 + (ratio - 2) * 30;
+  else pct = 90 + Math.min((ratio - 3) * 5, 10);
+  return Math.round(Math.max(2, Math.min(98, pct)));
+}
+
+function buildDischargeSection(discharge){
+  const { baseline, forecastPeak, currentVal } = discharge;
+  if(baseline < 0.5){
+    return {
+      band: 'Low',
+      html: `<p style="font-size:22px;font-weight:600;font-family:'Fraunces',serif;color:var(--ink);margin:0 0 6px;">~5%</p>
+      <p style="margin:0 0 8px;color:var(--muted);font-size:12px;">Indicative flood likelihood — not an official probability.</p>
+      <p>No significant river channel is modelled at this exact point (current reading: ${currentVal.toFixed(2)} m³/s), so this is a low baseline default.</p>
+      <p style="font-size:11.5px;color:var(--muted);margin-top:4px;">GloFAS resolves rivers on a ~5km grid — a low number here just means this precise spot isn't on a major modelled river, not necessarily that the wider area has no flood risk.</p>`
+    };
+  }
+  const ratio = forecastPeak / baseline;
+  const pct = dischargeRatioToPercent(ratio);
+  let band;
+  if(ratio >= 3) band = 'Severe';
+  else if(ratio >= 2) band = 'High';
+  else if(ratio >= 1.3) band = 'Moderate';
+  else band = 'Low';
+  return {
+    band,
+    html: `<p style="font-size:22px;font-weight:600;font-family:'Fraunces',serif;color:var(--ink);margin:0 0 6px;">${pct}%</p>
+    <p style="margin:0 0 8px;color:var(--muted);font-size:12px;">Indicative flood likelihood — not an official probability, worked out from forecast river discharge vs. this location's own recent normal.</p>
+    <p style="font-size:11.5px;color:var(--muted);">Modelled river discharge (GloFAS): currently ${currentVal.toFixed(1)} m³/s vs a 30-day average of ${baseline.toFixed(1)} m³/s, forecast to peak at ${forecastPeak.toFixed(1)} m³/s (${ratio.toFixed(1)}× normal) over the next 7 days.</p>
+    <p style="font-size:11.5px;color:var(--muted);margin-top:4px;">Run by the EU's Copernicus Emergency Management Service — the same hydrological modelling family European flood agencies use. Reflects the nearest modelled river channel, which may not be exactly under this point.</p>`
+  };
+}
+
+async function checkFlood(lat, lng){
+  try{
+    // The Environment Agency API only has data for England. Outside that box, this
+    // uses GloFAS (see fetchGlobalRiverDischarge above) for real global coverage instead.
+    const inEngland = lat >= 49.9 && lat <= 55.8 && lng >= -6.5 && lng <= 1.8;
+
+    // Soil type (SoilGrids) is genuinely global, so it's fetched either way.
+    // GloFAS discharge is only fetched for non-England points — England already
+    // has the real official EA data, so a second modelled indicator on top of it
+    // would just be redundant noise rather than anything actually relevant.
+    const soilPromise = fetch(`https://rest.isric.org/soilgrids/v2.0/classification/query?lon=${lng}&lat=${lat}&number_classes=1`);
+
+    if(!inEngland){
+      const dischargePromise = fetchGlobalRiverDischarge(lat, lng).catch(e => ({ error: e.message }));
+      const [soilRes, dischargeResult] = await Promise.all([soilPromise, dischargePromise]);
+      let soilType = null, soilConfidence = null;
+      if(soilRes.ok){
+        const soilData = await soilRes.json();
+        soilType = soilData.wrb_class_name || null;
+        if(soilData.wrb_class_probability && soilData.wrb_class_probability.length){
+          soilConfidence = soilData.wrb_class_probability[0][1];
+        }
+      }
+
+      let band = 'Unknown';
+      let dischargeHtml = `<p style="font-size:12px;color:var(--muted);">River discharge data unavailable right now${dischargeResult.error ? ': ' + dischargeResult.error : ''}.</p>`;
+      if(!dischargeResult.error){
+        const built = buildDischargeSection(dischargeResult);
+        band = built.band;
+        dischargeHtml = built.html;
+      }
+
+      setCard('flood', band,
+        `${dischargeHtml}
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);">
+          <p><strong>Soil type:</strong> ${soilType ? `${soilType}${soilConfidence != null ? ` (~${soilConfidence}% likelihood, WRB classification)` : ''}` : 'Unavailable for this point'}</p>
+        </div>
+        <div class="legend">Sources: Open-Meteo Flood API (GloFAS / Copernicus river discharge) · ISRIC SoilGrids (soil classification)</div>`
+      );
+      return;
+    }
+
+    const dist = 15; // km search radius
+    const [floodsRes, stationsRes, soilRes] = await Promise.all([
+      fetch(`https://environment.data.gov.uk/flood-monitoring/id/floods?lat=${lat}&long=${lng}&dist=${dist}`),
+      fetch(`https://environment.data.gov.uk/flood-monitoring/id/stations?lat=${lat}&long=${lng}&dist=${dist}&parameter=level`),
+      soilPromise
+    ]);
+    if(!floodsRes.ok) throw new Error(`Flood API returned ${floodsRes.status}`);
+    const floods = (await floodsRes.json()).items || [];
+    let stations = stationsRes.ok ? ((await stationsRes.json()).items || []) : [];
+
+    // The EA API does NOT return stations sorted by distance — sort them ourselves,
+    // using each station's own lat/long, so "nearest river" actually means nearest.
+    function haversineKm(lat1, lon1, lat2, lon2){
+      const R = 6371;
+      const toRad = deg => deg * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+      return 2 * R * Math.asin(Math.sqrt(a));
+    }
+    stations = stations
+      .filter(s => s.lat != null && s.long != null)
+      .map(s => ({ ...s, _distKm: haversineKm(lat, lng, s.lat, s.long) }))
+      .sort((a, b) => a._distKm - b._distKm);
+
+    // Nearby river names, nearest first, deduplicated, only within 6km of the click
+    // (the wider 15km flood-warning search radius is too loose for "which river is this")
+    const riverNames = [...new Set(
+      stations.filter(s => s._distKm <= 6 && s.riverName).map(s => s.riverName)
+    )];
+
+    // Soil type — SoilGrids (ISRIC), free global coverage, WRB classification
+    let soilType = null, soilConfidence = null;
+    if(soilRes.ok){
+      const soilData = await soilRes.json();
+      soilType = soilData.wrb_class_name || null;
+      if(soilData.wrb_class_probability && soilData.wrb_class_probability.length){
+        soilConfidence = soilData.wrb_class_probability[0][1];
+      }
+    }
+
+    // severityLevel: 1 Severe Warning, 2 Warning, 3 Alert, 4 Warning No Longer in Force
+    const active = floods.filter(f => f.severityLevel <= 3);
+    const severe = active.filter(f => f.severityLevel === 1);
+    const warnings = active.filter(f => f.severityLevel === 2);
+    const alerts = active.filter(f => f.severityLevel === 3);
+
+    let band, summary;
+    if(severe.length){
+      band = 'Severe';
+      summary = `${severe.length} severe flood warning${severe.length>1?'s':''} currently in force within ${dist}km — danger to life.`;
+    } else if(warnings.length){
+      band = 'High';
+      summary = `${warnings.length} active flood warning${warnings.length>1?'s':''} within ${dist}km. Flooding is expected.`;
+    } else if(alerts.length){
+      band = 'Moderate';
+      summary = `${alerts.length} flood alert${alerts.length>1?'s':''} in force within ${dist}km. Flooding is possible — stay aware.`;
+    } else if(stations.length){
+      band = 'Low';
+      summary = `No active warnings or alerts right now, but ${stations.length} river level monitoring station${stations.length>1?'s are':' is'} nearby — this is a watched watercourse.`;
+    } else {
+      band = 'Low';
+      summary = `No active flood warnings, alerts, or nearby monitoring stations found within ${dist}km.`;
+    }
+
+    let listHtml = '';
+    if(active.length){
+      listHtml = `<ul>` + active.slice(0,5).map(f => `<li>${f.description || f.eaAreaName || 'Flood area'} — ${
+        f.severityLevel===1?'Severe warning':f.severityLevel===2?'Warning':'Alert'
+      }</li>`).join('') + `</ul>`;
+    }
+
+    let detailsHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);">`;
+
+    detailsHtml += `<p><strong>River:</strong> ${
+      riverNames.length ? riverNames.slice(0,3).join(', ') : 'No named river station within ' + dist + 'km'
+    }</p>`;
+
+    detailsHtml += `<p><strong>Soil type:</strong> ${
+      soilType ? `${soilType}${soilConfidence != null ? ` (~${soilConfidence}% likelihood, WRB classification)` : ''}` : 'Unavailable for this point'
+    }</p>`;
+
+    detailsHtml += `</div>`;
+
+    setCard('flood', band,
+      `<p>${summary}</p>${listHtml}${detailsHtml}
+      <div class="legend">Sources: Environment Agency flood-monitoring API (warnings, stations, river names) · ISRIC SoilGrids (soil classification)</div>`
+    );
+  } catch(err){
+    setError('flood', err.message + '. (England-only official warnings — if this point is outside England, coverage falls back to global GloFAS river discharge data, or your network may be blocking the request.)');
+  }
+}
+
+// ---------------------------------------------------------------
+// 2. WILDFIRE WEATHER — Open-Meteo forecast API (free, no key, worldwide)
+// Simplified fire-weather heuristic: hot + dry + windy + little recent rain = elevated risk.
+// This is NOT the official Fire Severity Index — it's a transparent proxy built from real weather data.
+// ---------------------------------------------------------------
+async function checkFireWeather(lat, lng){
+  try{
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
+      `&current=temperature_2m,relative_humidity_2m,wind_speed_10m` +
+      `&daily=precipitation_sum&past_days=7&forecast_days=1&timezone=auto`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error(`Weather API returned ${res.status}`);
+    const data = await res.json();
+
+    const temp = data.current.temperature_2m;
+    const humidity = data.current.relative_humidity_2m;
+    const wind = data.current.wind_speed_10m;
+    const rain7d = (data.daily.precipitation_sum || []).reduce((a,b) => a + (b||0), 0);
+
+    // Simple points-based heuristic (transparent, not an official index)
+    let score = 0;
+    if(temp >= 27) score += 3; else if(temp >= 21) score += 2; else if(temp >= 15) score += 1;
+    if(humidity <= 30) score += 3; else if(humidity <= 45) score += 2; else if(humidity <= 60) score += 1;
+    if(wind >= 30) score += 2; else if(wind >= 18) score += 1;
+    if(rain7d <= 2) score += 2; else if(rain7d <= 8) score += 1;
+
+    let band;
+    if(score >= 8) band = 'Severe';
+    else if(score >= 6) band = 'High';
+    else if(score >= 3) band = 'Moderate';
+    else band = 'Low';
+
+    setCard('fire', band,
+      `<p>Current conditions: ${temp.toFixed(1)}°C, ${humidity}% humidity, ${wind.toFixed(0)} km/h wind, ${rain7d.toFixed(1)}mm rain in the last 7 days.</p>
+      <p style="margin-top:8px;">Most relevant to vegetated or wooded areas — built-up areas carry lower real wildfire exposure regardless of this score.</p>
+      <div class="legend">Source: Open-Meteo forecast API. Score is a transparent heuristic (temp + humidity + wind + rainfall), not the official Met Office Fire Severity Index.</div>`
+    );
+  } catch(err){
+    setError('fire', err.message);
+  }
+}
+
+// ---------------------------------------------------------------
+// 3. TERRAIN / LANDSLIDE — Open-Elevation API (free, no key)
+// Samples 4 points ~400m around the click and computes the steepest slope between them.
+// Slope is a genuine landslide risk factor, but real susceptibility also depends on geology,
+// drainage and land use — this is a partial indicator only.
+// ---------------------------------------------------------------
+// ---------------------------------------------------------------
+// 3. TERRAIN / LANDSLIDE — composite indicative score built from three real, live variables:
+//    1) slope (Open-Meteo elevation, 5-point sample)
+//    2) rainfall over the last 30 days (Open-Meteo forecast API)
+//    3) current soil saturation near the surface (Open-Meteo forecast API, soil_moisture_0_to_1cm)
+// This is a transparent, weighted heuristic — NOT an official landslide susceptibility rating.
+// It deliberately excludes geology/bedrock type: there's no free, reliable, point-lookup API for
+// that, so it's flagged as a gap rather than faked. For an official view, see BGS GeoSure.
+// ---------------------------------------------------------------
+async function checkTerrain(lat, lng){
+  try{
+    const d = 0.0036; // roughly 400m at UK latitudes
+    const points = [
+      [lat, lng],
+      [lat + d, lng],
+      [lat - d, lng],
+      [lat, lng + d],
+      [lat, lng - d],
+    ];
+    const lats = points.map(p => p[0]).join(',');
+    const lngs = points.map(p => p[1]).join(',');
+
+    const [elevRes, weatherRes] = await Promise.all([
+      fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lngs}`),
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
+        `&hourly=soil_moisture_0_to_1cm&daily=precipitation_sum&past_days=30&forecast_days=1&timezone=auto`)
+    ]);
+    if(!elevRes.ok) throw new Error(`Elevation API returned ${elevRes.status}`);
+    if(!weatherRes.ok) throw new Error(`Weather API returned ${weatherRes.status}`);
+
+    const elevData = await elevRes.json();
+    const elevs = elevData.elevation;
+    if(!elevs || elevs.length < points.length) throw new Error('Elevation API returned incomplete data');
+    const centre = elevs[0];
+    const distMeters = 400;
+    let maxDrop = 0;
+    for(let i = 1; i < elevs.length; i++){
+      maxDrop = Math.max(maxDrop, Math.abs(elevs[i] - centre));
+    }
+    const slopeDeg = Math.atan(maxDrop / distMeters) * (180/Math.PI);
+
+    const weatherData = await weatherRes.json();
+    const rain30d = (weatherData.daily.precipitation_sum || []).reduce((a,b) => a + (b||0), 0);
+    const soilSeries = weatherData.hourly.soil_moisture_0_to_1cm || [];
+    // take the most recent non-null reading
+    let soilMoisture = null;
+    for(let i = soilSeries.length - 1; i >= 0; i--){
+      if(soilSeries[i] !== null && soilSeries[i] !== undefined){ soilMoisture = soilSeries[i]; break; }
+    }
+
+    // --- Weighted composite score (0–100) ---
+    // Slope: up to 45 points (dominant factor — steep ground is the base requirement for a slide)
+    let slopePts = 0;
+    if(slopeDeg >= 30) slopePts = 45;
+    else if(slopeDeg >= 15) slopePts = 32;
+    else if(slopeDeg >= 5) slopePts = 15;
+    else slopePts = 3;
+
+    // Rainfall (30-day total): up to 25 points
+    let rainPts = 0;
+    if(rain30d >= 150) rainPts = 25;
+    else if(rain30d >= 80) rainPts = 16;
+    else if(rain30d >= 40) rainPts = 8;
+    else rainPts = 2;
+
+    // Soil saturation (m³/m³, roughly 0–0.5): up to 30 points
+    let soilPts = 0;
+    let soilLabel = 'Unknown';
+    if(soilMoisture !== null){
+      if(soilMoisture >= 0.35){ soilPts = 30; soilLabel = 'Saturated'; }
+      else if(soilMoisture >= 0.25){ soilPts = 18; soilLabel = 'Moist'; }
+      else if(soilMoisture >= 0.15){ soilPts = 8; soilLabel = 'Slightly moist'; }
+      else { soilPts = 2; soilLabel = 'Dry'; }
+    }
+
+    const score = slopePts + rainPts + soilPts; // 0–100
+    let band;
+    if(score >= 70) band = 'Severe';
+    else if(score >= 45) band = 'High';
+    else if(score >= 20) band = 'Moderate';
+    else band = 'Low';
+
+    setCard('slide', band,
+      `<p style="font-size:22px;font-weight:600;font-family:'Fraunces',serif;color:var(--ink);margin:0 0 6px;">${score}%</p>
+      <p style="margin:0 0 10px;color:var(--muted);font-size:12px;">Indicative susceptibility score — not a scientific probability.</p>
+      <ul>
+        <li><strong>Slope:</strong> ~${slopeDeg.toFixed(1)}° over 400m (elevation ${centre.toFixed(0)}m) — ${slopePts}/45 pts</li>
+        <li><strong>Rainfall, last 30 days:</strong> ${rain30d.toFixed(0)}mm — ${rainPts}/25 pts</li>
+        <li><strong>Soil saturation now:</strong> ${soilLabel}${soilMoisture !== null ? ` (${soilMoisture.toFixed(2)} m³/m³)` : ''} — ${soilPts}/30 pts</li>
+      </ul>
+      <p style="margin-top:10px;">Missing from this score: <strong>geology/bedrock type</strong>, the single biggest real driver of landslide susceptibility.
+      There's no reliable free point-lookup API for it, so this is left out rather than guessed. Check
+      <a href="https://mapapps.bgs.ac.uk/geosure/" target="_blank" rel="noopener">BGS GeoSure</a> for the official geological rating of this area.</p>
+      <div class="legend">Source: Open-Meteo elevation + forecast APIs (slope, 30-day rainfall, surface soil moisture).</div>`
+    );
+  } catch(err){
+    setError('slide', err.message);
+  }
+}
+
+// ---------------------------------------------------------------
+// 3b. TERRAIN / LANDSLIDE — area-drawn version. Same scoring logic as the point
+// version above, except slope is the steepest gradient found between ANY two of
+// the shape's own points — every vertex you placed, plus the centre — rather than
+// a fixed ~400m radius around one point. This directly reflects the shape as
+// actually molded, rather than a generic grid over its bounding box. Rainfall and
+// soil saturation still use the area's centre, since those are regional weather
+// figures rather than something that varies point-to-point enough to be worth
+// sampling at every vertex.
+// ---------------------------------------------------------------
+async function checkTerrainArea(polygonPoints){
+  try{
+    const center = polygonCentroid(polygonPoints);
+    const samplePoints = [...polygonPoints.map(p => [p.lat, p.lng]), [center.lat, center.lng]];
+    const lats = samplePoints.map(p => p[0]).join(',');
+    const lngs = samplePoints.map(p => p[1]).join(',');
+
+    const [elevRes, weatherRes] = await Promise.all([
+      fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lngs}`),
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${center.lat}&longitude=${center.lng}` +
+        `&hourly=soil_moisture_0_to_1cm&daily=precipitation_sum&past_days=30&forecast_days=1&timezone=auto`)
+    ]);
+    if(!elevRes.ok) throw new Error(`Elevation API returned ${elevRes.status}`);
+    if(!weatherRes.ok) throw new Error(`Weather API returned ${weatherRes.status}`);
+
+    const elevData = await elevRes.json();
+    const elevs = elevData.elevation;
+    if(!elevs || elevs.length < samplePoints.length) throw new Error('Elevation API returned incomplete data');
+
+    // Steepest gradient between ANY two of the shape's own points, not just from the centre
+    let maxSlopeDeg = 0;
+    for(let a = 0; a < samplePoints.length; a++){
+      for(let b = a + 1; b < samplePoints.length; b++){
+        const distMeters = distanceKm(samplePoints[a][0], samplePoints[a][1], samplePoints[b][0], samplePoints[b][1]) * 1000;
+        if(distMeters < 20) continue; // points essentially on top of each other, skip
+        const drop = Math.abs(elevs[a] - elevs[b]);
+        const slopeDeg = Math.atan(drop / distMeters) * (180 / Math.PI);
+        if(slopeDeg > maxSlopeDeg) maxSlopeDeg = slopeDeg;
+      }
+    }
+    const minElev = Math.min(...elevs);
+    const maxElev = Math.max(...elevs);
+
+    const weatherData = await weatherRes.json();
+    const rain30d = (weatherData.daily.precipitation_sum || []).reduce((a, b) => a + (b || 0), 0);
+    const soilSeries = weatherData.hourly.soil_moisture_0_to_1cm || [];
+    let soilMoisture = null;
+    for(let i = soilSeries.length - 1; i >= 0; i--){
+      if(soilSeries[i] !== null && soilSeries[i] !== undefined){ soilMoisture = soilSeries[i]; break; }
+    }
+
+    let slopePts = 0;
+    if(maxSlopeDeg >= 30) slopePts = 45;
+    else if(maxSlopeDeg >= 15) slopePts = 32;
+    else if(maxSlopeDeg >= 5) slopePts = 15;
+    else slopePts = 3;
+
+    let rainPts = 0;
+    if(rain30d >= 150) rainPts = 25;
+    else if(rain30d >= 80) rainPts = 16;
+    else if(rain30d >= 40) rainPts = 8;
+    else rainPts = 2;
+
+    let soilPts = 0;
+    let soilLabel = 'Unknown';
+    if(soilMoisture !== null){
+      if(soilMoisture >= 0.35){ soilPts = 30; soilLabel = 'Saturated'; }
+      else if(soilMoisture >= 0.25){ soilPts = 18; soilLabel = 'Moist'; }
+      else if(soilMoisture >= 0.15){ soilPts = 8; soilLabel = 'Slightly moist'; }
+      else { soilPts = 2; soilLabel = 'Dry'; }
+    }
+
+    const score = slopePts + rainPts + soilPts;
+    let band;
+    if(score >= 70) band = 'Severe';
+    else if(score >= 45) band = 'High';
+    else if(score >= 20) band = 'Moderate';
+    else band = 'Low';
+
+    setCard('slide', band,
+      `<p style="font-size:22px;font-weight:600;font-family:'Fraunces',serif;color:var(--ink);margin:0 0 6px;">${score}%</p>
+      <p style="margin:0 0 10px;color:var(--muted);font-size:12px;">Worst-case indicative susceptibility found across your shape — not a scientific probability.</p>
+      <ul>
+        <li><strong>Steepest gradient found between your shape's points:</strong> ~${maxSlopeDeg.toFixed(1)}° — ${slopePts}/45 pts</li>
+        <li><strong>Elevation range across your shape:</strong> ${minElev.toFixed(0)}–${maxElev.toFixed(0)}m</li>
+        <li><strong>Rainfall, last 30 days (shape centre):</strong> ${rain30d.toFixed(0)}mm — ${rainPts}/25 pts</li>
+        <li><strong>Soil saturation now (shape centre):</strong> ${soilLabel}${soilMoisture !== null ? ` (${soilMoisture.toFixed(2)} m³/m³)` : ''} — ${soilPts}/30 pts</li>
+      </ul>
+      <p style="margin-top:10px;">Missing from this score: <strong>geology/bedrock type</strong>, the single biggest real driver of landslide susceptibility.
+      There's no reliable free point-lookup API for it, so this is left out rather than guessed. Check
+      <a href="https://mapapps.bgs.ac.uk/geosure/" target="_blank" rel="noopener">BGS GeoSure</a> for the official geological rating of this area.</p>
+      <div class="legend">Source: Open-Meteo elevation (sampled at every point of your drawn shape, plus its centre) + forecast APIs (30-day rainfall, surface soil moisture at the centre).</div>`
+    );
+  } catch(err){
+    setError('slide', err.message);
+  }
+}
+
+// ---------------------------------------------------------------
+// 4. EARTHQUAKE — USGS Earthquake Catalog API (free, no key, worldwide)
+// Looks at the actual recorded seismic history near this point over the last 50 years.
+// Real event data, not a prediction — past frequency/magnitude only.
+// ---------------------------------------------------------------
+async function checkEarthquake(lat, lng){
+  try{
+    const radiusKm = 15;
+    const years = 50;
+    const start = new Date();
+    start.setFullYear(start.getFullYear() - years);
+    const startStr = start.toISOString().slice(0,10);
+
+    const localUrl = `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson` +
+      `&latitude=${lat}&longitude=${lng}&maxradiuskm=${radiusKm}` +
+      `&minmagnitude=3&starttime=${startStr}&orderby=magnitude`;
+
+    // Reverse-geocode to find which country was clicked (free, no-key, client-friendly API)
+    const geoUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`;
+
+    const [localRes, geoRes] = await Promise.all([fetch(localUrl), fetch(geoUrl)]);
+    if(!localRes.ok) throw new Error(`USGS API returned ${localRes.status}`);
+    const localData = await localRes.json();
+    const events = localData.features || [];
+    const count = events.length;
+    const maxMag = count ? Math.max(...events.map(e => e.properties.mag)) : 0;
+
+    // Count thresholds are scaled down for a 15km radius (a much smaller catchment
+    // than a typical seismic-hazard search, so far fewer events are expected even
+    // in genuinely active areas).
+    let band;
+    if(maxMag >= 6) band = 'Severe';
+    else if(maxMag >= 5 || count >= 5) band = 'High';
+    else if(maxMag >= 4 || count >= 2) band = 'Moderate';
+    else band = 'Low';
+
+    let detail = `<p>${count} recorded earthquake${count===1?'':'s'} of magnitude 3+ within ${radiusKm}km over the last ${years} years.</p>`;
+    const strongest = events.find(e => e.properties.mag === maxMag);
+    if(strongest){
+      const place = strongest.properties.place || 'nearby';
+      const date = new Date(strongest.properties.time).toISOString().slice(0,10);
+      detail += `<p style="margin-top:8px;"><strong>Strongest within ${radiusKm}km:</strong> M${maxMag.toFixed(1)}, ${place} (${date})</p>`;
+    }
+
+    // Country-wide historical record, using the reverse-geocoded country and its bounding box
+    let countryHtml = '';
+    if(geoRes.ok){
+      const geoData = await geoRes.json();
+      const countryCode = geoData.countryCode;
+      const countryName = geoData.countryName;
+      if(countryCode && COUNTRY_BBOXES[countryCode]){
+        const [, bbox] = COUNTRY_BBOXES[countryCode];
+        const [west, south, east, north] = bbox;
+        const countryUrl = `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson` +
+          `&minlongitude=${west}&minlatitude=${south}&maxlongitude=${east}&maxlatitude=${north}` +
+          `&orderby=magnitude&limit=1&starttime=1900-01-01`;
+        try{
+          const countryRes = await fetch(countryUrl);
+          if(countryRes.ok){
+            const countryData = await countryRes.json();
+            const top = countryData.features && countryData.features[0];
+            if(top){
+              const mag = top.properties.mag;
+              const place = top.properties.place || countryName;
+              const date = new Date(top.properties.time).toISOString().slice(0,10);
+              countryHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);">
+                <p><strong>Highest ever recorded in ${countryName}:</strong> M${mag.toFixed(1)}, ${place} (${date})</p>
+                <p style="font-size:11.5px;color:var(--muted);margin-top:4px;">Uses a rectangular bounding box around the country, so it may include a small sliver of a neighbouring country along the border.</p>
+              </div>`;
+            } else {
+              countryHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);">
+                <p><strong>${countryName}:</strong> no magnitude-3+ earthquakes on record since 1900 in the USGS catalog.</p>
+              </div>`;
+            }
+          }
+        } catch(e){ /* country-wide lookup is a bonus — fail silently if it errors */ }
+      } else if(countryName){
+        countryHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);">
+          <p style="font-size:12px;color:var(--muted);">Country-wide record unavailable for ${countryName} (not in this tool's country lookup table).</p>
+        </div>`;
+      }
+    }
+
+    setCard('quake', band,
+      `${detail}${countryHtml}
+      <div class="legend">Source: USGS Earthquake Catalog (real recorded events, not a prediction) · country lookup via BigDataCloud reverse geocoding</div>`
+    );
+  } catch(err){
+    setError('quake', err.message);
+  }
+}
+
+// ---------------------------------------------------------------
+// 5. EXTREME HEAT — Open-Meteo forecast + archive APIs (free, no key, worldwide)
+// Compares the 7-day forecast peak against THIS location's own recent seasonal norm
+// (same ~60-day window, one year earlier) rather than a fixed temperature — a flat
+// threshold like "30°C = severe" would be meaningless comparing London to Riyadh.
+// This is how a heatwave is actually defined climatologically: deviation from local normal.
+// ---------------------------------------------------------------
+async function checkHeat(lat, lng){
+  try{
+    const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
+      `&daily=temperature_2m_max&forecast_days=7&timezone=auto`;
+
+    const now = new Date();
+    const centreLastYear = new Date(now);
+    centreLastYear.setFullYear(now.getFullYear() - 1);
+    const startDate = new Date(centreLastYear); startDate.setDate(startDate.getDate() - 30);
+    const endDate = new Date(centreLastYear); endDate.setDate(endDate.getDate() + 30);
+    const fmt = d => d.toISOString().slice(0,10);
+    const archiveUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}` +
+      `&start_date=${fmt(startDate)}&end_date=${fmt(endDate)}&daily=temperature_2m_max&timezone=auto`;
+
+    const [forecastRes, archiveRes] = await Promise.all([fetch(forecastUrl), fetch(archiveUrl)]);
+    if(!forecastRes.ok) throw new Error(`Forecast API returned ${forecastRes.status}`);
+    const forecastData = await forecastRes.json();
+    const highs = forecastData.daily.temperature_2m_max || [];
+    const peak = highs.length ? Math.max(...highs) : null;
+    if(peak === null) throw new Error('No forecast data returned');
+
+    let seasonalAvg = null;
+    if(archiveRes.ok){
+      const archiveData = await archiveRes.json();
+      const pastHighs = (archiveData.daily.temperature_2m_max || []).filter(v => v !== null && v !== undefined);
+      if(pastHighs.length){
+        seasonalAvg = pastHighs.reduce((a,b) => a+b, 0) / pastHighs.length;
+      }
+    }
+
+    let band, explanation;
+    if(seasonalAvg !== null){
+      const anomaly = peak - seasonalAvg;
+      if(anomaly >= 8) band = 'Severe';
+      else if(anomaly >= 5) band = 'High';
+      else if(anomaly >= 2) band = 'Moderate';
+      else band = 'Low';
+      explanation = `<p>Forecast peak: <strong>${peak.toFixed(1)}°C</strong>, vs this location's typical high for this time of year of <strong>${seasonalAvg.toFixed(1)}°C</strong> (${anomaly >= 0 ? '+' : ''}${anomaly.toFixed(1)}°C).</p>
+      <p style="margin-top:8px;">Judged against local seasonal normal, not a fixed number — so this reads the same way whether you're checking a cold or a hot climate. Baseline is a single prior year's same ~60-day window, not a multi-decade climate normal, so treat it as indicative.</p>`;
+    } else {
+      // Fallback if the archive lookup fails — absolute bands as a rough backstop only
+      if(peak >= 38) band = 'Severe';
+      else if(peak >= 32) band = 'High';
+      else if(peak >= 27) band = 'Moderate';
+      else band = 'Low';
+      explanation = `<p>Forecast peak temperature over the next 7 days: <strong>${peak.toFixed(1)}°C</strong>.</p>
+      <p style="margin-top:8px;">Couldn't load a seasonal baseline for comparison, so this band uses rough fixed thresholds only — less meaningful for naturally hot or cold climates.</p>`;
+    }
+
+    setCard('heat', band,
+      `${explanation}
+      <div class="legend">Source: Open-Meteo forecast + historical archive APIs</div>`
+    );
+  } catch(err){
+    setError('heat', err.message);
+  }
+}
+
+// ---------------------------------------------------------------
+// 6. HIGH WIND / STORM — Open-Meteo 7-day forecast (free, no key, worldwide)
+// Uses peak forecast wind gust, the figure most relevant to storm/structural risk.
+// ---------------------------------------------------------------
+async function checkWind(lat, lng){
+  try{
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
+      `&daily=wind_gusts_10m_max&forecast_days=7&timezone=auto`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error(`Weather API returned ${res.status}`);
+    const data = await res.json();
+    const gusts = data.daily.wind_gusts_10m_max || [];
+    const peak = gusts.length ? Math.max(...gusts) : null;
+    if(peak === null) throw new Error('No forecast data returned');
+
+    let band;
+    if(peak >= 100) band = 'Severe';
+    else if(peak >= 80) band = 'High';
+    else if(peak >= 60) band = 'Moderate';
+    else band = 'Low';
+
+    setCard('wind', band,
+      `<p>Forecast peak wind gust over the next 7 days: <strong>${peak.toFixed(0)} km/h</strong>.</p>
+      <p style="margin-top:8px;">Gusts above ~80km/h can cause structural and tree damage; above ~100km/h is severe-storm territory.</p>
+      <div class="legend">Source: Open-Meteo 7-day forecast API</div>`
+    );
+  } catch(err){
+    setError('wind', err.message);
+  }
+}
+
+// ---------------------------------------------------------------
+// 7. TROPICAL CYCLONE — built entirely from the GDACS global disaster feed:
+//    a) live/recent named storms affecting this country
+//    b) historical proximity — how close, and how many, tracked storm points
+//       (from GDACS's own episode data) have come to this exact clicked point
+// GDACS tracks the same phenomenon under one type code (TC) regardless of ocean basin;
+// the label shown (Hurricane / Typhoon / Cyclone) is chosen locally by regionalStormName().
+// An earlier version of this queried NOAA's IBTrACS archive directly via their ERDDAP
+// server for richer historical best-track data, but that server does not allow
+// cross-origin browser requests (it fails with a generic "Failed to fetch", the
+// signature of a CORS block) — so this uses GDACS's own episode coordinates instead,
+// the same feed already proven to work for the section above.
+// Deliberately NOT included: a landfall probability or "chance of crossing this point".
+// That requires real ensemble-forecast modelling (the cone-of-uncertainty math national
+// weather agencies run on supercomputers) — faking a percentage here would be worse than
+// not showing one. What's shown instead is real historical proximity: how many storms
+// have actually passed near this point, and how close, which is the honest version of
+// "how likely" that can be built from public data.
+// ---------------------------------------------------------------
+function categoryFromWindKmh(windKmh, stormName){
+  if(windKmh === null || windKmh === undefined || isNaN(windKmh)) return 'Unclassified';
+  if(windKmh >= 252) return `${stormName} — Category 5`;
+  if(windKmh >= 209) return `${stormName} — Category 4`;
+  if(windKmh >= 178) return `${stormName} — Category 3`;
+  if(windKmh >= 154) return `${stormName} — Category 2`;
+  if(windKmh >= 119) return `${stormName} — Category 1`;
+  if(windKmh >= 63) return 'Tropical storm';
+  return 'Tropical depression';
+}
+
+// Groups every episode point in the GDACS TC feed by storm (eventid) and keeps
+// each storm's closest approach to the clicked point — this is a coarser signal
+// than a full best-track archive (GDACS stores episode centroids, not a dense
+// track), and shares the same recent-years window as the section above, but it's
+// built from a source already confirmed to work rather than one that doesn't.
+function computeHistoricalProximity(lat, lng, tcFeatures){
+  const byEvent = {};
+  for(const f of tcFeatures){
+    const [lon2, lat2] = f.geometry.coordinates;
+    const dist = distanceKm(lat, lng, lat2, lon2);
+    const id = f.properties.eventid;
+    if(!byEvent[id] || dist < byEvent[id].distKm){
+      byEvent[id] = {
+        name: f.properties.eventname || 'Unnamed storm',
+        distKm: dist,
+        windKmh: f.properties.severitydata ? f.properties.severitydata.severity : null,
+        fromdate: f.properties.fromdate
+      };
+    }
+  }
+  return Object.values(byEvent).sort((a, b) => a.distKm - b.distKm);
+}
+
+async function checkCyclone(lat, lng){
+  const stormName = regionalStormName(lat, lng);
+  try{
+    const geoUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`;
+    const feedUrl = `https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventtype=TC&alertlevel=green;orange;red`;
+    const [geoRes, feedRes] = await Promise.all([fetch(geoUrl), fetch(feedUrl)]);
+    if(!feedRes.ok) throw new Error(`GDACS API returned ${feedRes.status}`);
+    const feedData = await feedRes.json();
+    const tcFeatures = (feedData.features || []).filter(f => f.properties.eventtype === 'TC');
+
+    let countryCode = null, countryName = null;
+    if(geoRes.ok){
+      const geoData = await geoRes.json();
+      countryCode = geoData.countryCode;
+      countryName = geoData.countryName;
+    }
+
+    // Prefer events affecting this specific country; fall back to geographic proximity
+    let matches = countryCode
+      ? tcFeatures.filter(f => (f.properties.affectedcountries || []).some(c => c.iso2 === countryCode))
+      : [];
+    if(matches.length === 0){
+      matches = tcFeatures.filter(f => {
+        const [lon2, lat2] = f.geometry.coordinates;
+        return distanceKm(lat, lng, lat2, lon2) <= 2000;
+      });
+    }
+
+    // Dedupe by eventid, keeping each storm's highest-severity episode
+    const byEvent = {};
+    for(const f of matches){
+      const id = f.properties.eventid;
+      const sev = (f.properties.severitydata && f.properties.severitydata.severity) || 0;
+      const existingSev = byEvent[id] && byEvent[id].properties.severitydata ? byEvent[id].properties.severitydata.severity : -1;
+      if(!byEvent[id] || sev > existingSev) byEvent[id] = f;
+    }
+    const uniqueStorms = Object.values(byEvent).sort((a, b) =>
+      new Date(b.properties.fromdate) - new Date(a.properties.fromdate)
+    );
+
+    const anyRed = uniqueStorms.some(s => s.properties.alertlevel === 'Red');
+    const anyOrange = uniqueStorms.some(s => s.properties.alertlevel === 'Orange');
+    let band = anyRed ? 'High' : anyOrange ? 'Moderate' : 'Low';
+
+    let body;
+    if(uniqueStorms.length === 0){
+      body = `<p>No ${stormName.toLowerCase()}s show up in GDACS's live global feed for ${countryName || 'this area'} right now.</p>
+      <p style="margin-top:8px;font-size:11.5px;color:var(--muted);">This feed only covers roughly the last couple of years of live-tracked storms — it's not a full historical archive, so this isn't the same as saying none have ever happened here.</p>`;
+    } else {
+      const list = uniqueStorms.slice(0, 5).map(s => {
+        const p = s.properties;
+        const dateStr = new Date(p.fromdate).toISOString().slice(0, 10);
+        const sevText = (p.severitydata && p.severitydata.severitytext) || '';
+        return `<li><strong>${p.eventname || 'Unnamed storm'}</strong> — ${sevText} — ${p.alertlevel} alert (${dateStr})</li>`;
+      }).join('');
+      body = `<p>${uniqueStorms.length} recent ${stormName.toLowerCase()}${uniqueStorms.length > 1 ? 's' : ''} affecting ${countryName || 'this area'} in GDACS's live feed:</p><ul>${list}</ul>`;
+    }
+
+    // Historical proximity — built from the same GDACS feed fetched above, so no
+    // second network call and no dependence on a server that blocks browser requests.
+    let historyHtml = '';
+    try{
+      const tracks = computeHistoricalProximity(lat, lng, tcFeatures);
+      const within500 = tracks.filter(t => t.distKm <= 500);
+      if(tracks.length === 0){
+        historyHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);">
+          <p><strong>Historical proximity (GDACS feed, recent years):</strong> no tracked storm point found anywhere in this feed near this location.</p>
+        </div>`;
+      } else {
+        const closestList = tracks.slice(0, 5).map(t => {
+          const dateStr = t.fromdate ? new Date(t.fromdate).toISOString().slice(0, 10) : '';
+          const cat = categoryFromWindKmh(t.windKmh, stormName);
+          const windText = t.windKmh != null ? `, ${Math.round(t.windKmh)} km/h peak wind` : '';
+          return `<li><strong>${t.name}</strong> (${dateStr}) — closest approach ${Math.round(t.distKm)}km — ${cat}${windText}</li>`;
+        }).join('');
+        historyHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);">
+          <p><strong>Historical proximity to this exact point (GDACS feed, recent years):</strong>
+          ${within500.length} storm${within500.length === 1 ? '' : 's'} tracked within 500km of this point.</p>
+          <ul style="margin-top:6px;">${closestList}</ul>
+          <p style="margin-top:8px;font-size:11.5px;color:var(--muted);">This is real historical frequency from GDACS's own storm records, not a landfall probability — a genuine forecast of whether a storm will cross this point requires ensemble modelling that only national weather agencies run. Check your national meteorological or hurricane centre for any active forecast.</p>
+        </div>`;
+      }
+    } catch(histErr){
+      historyHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line);">
+        <p style="font-size:12px;color:var(--muted);">Historical proximity unavailable right now: ${histErr.message}</p>
+      </div>`;
+    }
+
+    document.getElementById('storm-label').textContent = `${stormName} activity`;
+    setCard('storm', band,
+      `${body}${historyHtml}
+      <div class="legend">Source: GDACS global disaster feed (both the recent-activity list and the historical proximity below). Naming: ${stormName} is the regionally correct term here — same phenomenon as a hurricane or typhoon elsewhere.</div>`
+    );
+  } catch(err){
+    document.getElementById('storm-label').textContent = `${stormName} activity`;
+    setError('storm', err.message);
+  }
+}
+
+// ---------------------------------------------------------------
+// 8. VOLCANO — nearest known volcano (Smithsonian Global Volcanism Program,
+// same source as the toolbar's Volcanoes layer, sharing its cache), with its
+// real height, last recorded eruption, and current status cross-checked
+// against GDACS's live volcanic-eruption feed.
+//
+// Deliberately NOT included: a "% chance of erupting in the next N days."
+// Real short-term eruption forecasting needs seismometers, ground-deformation
+// sensors and gas-emission monitoring specific to that one volcano — data
+// individual volcano observatories hold, not something available through any
+// free global API. Fabricating a number here would be actively irresponsible
+// given people might genuinely rely on it, so this shows what's real instead.
+// ---------------------------------------------------------------
+async function checkVolcano(lat, lng){
+  try{
+    const { list, source } = await getVolcanoList();
+
+    let nearest = null, nearestDist = Infinity;
+    for(const v of list){
+      const d = distanceKm(lat, lng, v.lat, v.lng);
+      if(d < nearestDist){ nearestDist = d; nearest = v; }
+    }
+
+    const NEARBY_KM = 50;
+    if(!nearest || nearestDist > NEARBY_KM){
+      setCard('volcano', 'Low',
+        `<p>No known volcano within ${NEARBY_KM}km of this point.</p>
+        <div class="legend">Source: Smithsonian Global Volcanism Program${source === 'fallback' ? ' (fallback list — live service unreachable)' : ''}</div>`
+      );
+      return;
+    }
+
+    // Current status — the same live GDACS cross-reference used by the toolbar layer
+    let erupting = false, alertLevel = null;
+    try{
+      const res = await fetch('https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?alertlevel=green;orange;red');
+      if(res.ok){
+        const data = await res.json();
+        const voEvents = (data.features || []).filter(f => f.properties.eventtype === 'VO');
+        const nearbyEvent = voEvents.find(f => {
+          const [lon2, lat2] = f.geometry.coordinates;
+          return distanceKm(nearest.lat, nearest.lng, lat2, lon2) <= 50;
+        });
+        if(nearbyEvent){ erupting = true; alertLevel = nearbyEvent.properties.alertlevel; }
+      }
+    } catch(e){ /* proceed without live status if GDACS is unreachable */ }
+
+    const band = erupting ? (alertLevel === 'Red' ? 'Severe' : 'High') : 'Low';
+
+    setCard('volcano', band,
+      `<p><strong>${nearest.name}</strong>${nearest.country ? `, ${nearest.country}` : ''} — ${nearestDist.toFixed(0)}km from this point</p>
+      <ul>
+        <li><strong>Height:</strong> ${nearest.elevation != null ? `${nearest.elevation}m above sea level` : 'Not recorded for this volcano'}</li>
+        <li><strong>Last known eruption:</strong> ${nearest.lastErupted || 'Not recorded in the GVP database'}</li>
+        <li><strong>Currently erupting:</strong> ${erupting ? `Yes — ${alertLevel} alert (GDACS live feed)` : 'No, not currently'}</li>
+      </ul>
+      <p style="margin-top:10px;font-size:11.5px;color:var(--muted);">Deliberately not shown: a "chance of erupting in the next 5 days." Real short-term eruption forecasting needs seismometers, ground-deformation sensors and gas monitoring specific to this volcano — not something any free global API provides. What's above is real instead: this volcano's actual height, its last recorded eruption, and whether it's erupting right now.</p>
+      <div class="legend">Sources: Smithsonian Global Volcanism Program${source === 'fallback' ? ' (fallback list)' : ''} · GDACS (current eruption status)</div>`
+    );
+  } catch(err){
+    setError('volcano', err.message);
+  }
+}
+</script>
+</body>
+</html>
