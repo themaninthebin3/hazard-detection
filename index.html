@@ -529,6 +529,7 @@
     color:var(--muted);
     margin-top:4px;
   }
+  #landscape-toggle-btn{display:none;}
   @media (max-width: 820px){
     .app{flex-direction:column;}
     aside{max-width:none; border-left:none; border-top:1px solid var(--line); transition:flex-basis .3s ease, min-height .3s ease;}
@@ -540,6 +541,26 @@
     }
     .sidebar-toggle svg{transform:rotate(90deg);}
     .sidebar-toggle.collapsed-icon svg{transform:rotate(-90deg);}
+    #landscape-toggle-btn{display:inline-flex;}
+  }
+
+  /* ---------------- Force-landscape rotation (mobile) ----------------
+     True OS orientation-lock isn't reliably supported across mobile browsers
+     (iOS Safari blocks it outright for regular web pages), so this rotates
+     the whole page visually instead — works everywhere, no special
+     permissions needed. After enabling it, the phone needs to be physically
+     turned sideways for the now-rotated content to read right-side-up. */
+  html.force-landscape, html.force-landscape body{
+    width:100vh;
+    height:100vw;
+    overflow:hidden;
+  }
+  html.force-landscape body{
+    position:fixed;
+    top:0;
+    left:0;
+    transform-origin:top left;
+    transform:rotate(90deg) translateY(-100%);
   }
 
   /* ---------------- Home page ---------------- */
@@ -774,6 +795,10 @@
       ⚔️ <span id="conflicts-btn-text">Conflicts</span>
     </button>
     <div class="toolbar-divider"></div>
+    <button class="toolbar-btn" id="landscape-toggle-btn" title="Rotate to landscape (mobile) — physically turn your phone sideways after enabling">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="10" rx="2"/><path d="M18 12h.01"/></svg>
+      <span id="landscape-toggle-text">Landscape mode</span>
+    </button>
     <button class="toolbar-btn" id="theme-toggle-btn" title="Toggle dark mode">
       <span id="theme-toggle-icon">🌙</span> <span id="theme-toggle-text">Dark mode</span>
     </button>
@@ -984,6 +1009,33 @@ function applyTheme(theme){
 themeToggleBtn.addEventListener('click', () => {
   const current = document.documentElement.getAttribute('data-theme');
   applyTheme(current === 'dark' ? 'light' : 'dark');
+});
+
+// ---------------------------------------------------------------
+// Landscape mode (mobile) — see the CSS rule for how this actually works.
+// This is a visual rotation, not a true OS orientation lock (which iOS
+// Safari doesn't support for regular web pages) — the phone needs to be
+// physically turned sideways after enabling it for the content to read
+// right-side-up. Only shown on small screens; harmless if triggered on
+// desktop, just not useful there.
+// ---------------------------------------------------------------
+const landscapeToggleBtn = document.getElementById('landscape-toggle-btn');
+const landscapeToggleText = document.getElementById('landscape-toggle-text');
+let landscapeForced = false;
+
+landscapeToggleBtn.addEventListener('click', () => {
+  landscapeForced = !landscapeForced;
+  document.documentElement.classList.toggle('force-landscape', landscapeForced);
+  landscapeToggleText.textContent = landscapeForced ? 'Exit landscape' : 'Landscape mode';
+  landscapeToggleBtn.classList.toggle('active', landscapeForced);
+  // The map's effective container size just changed (width/height are
+  // swapped by the rotation) — recheck it once the browser has reflowed.
+  setTimeout(() => {
+    if(appEl.style.display !== 'none'){
+      map.invalidateSize();
+      fitMinZoomToContainer(map);
+    }
+  }, 60);
 });
 
 // ---------------------------------------------------------------
@@ -3277,4 +3329,3 @@ async function checkVolcano(lat, lng){
 </script>
 </body>
 </html>
-
